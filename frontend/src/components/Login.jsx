@@ -2,7 +2,7 @@ import { useState } from 'react';
 import api from '../api';
 import { UserRound, Stethoscope, ShieldCheck, Building2 } from 'lucide-react';
 
-const Login = ({ onSuccess, onRequireOtp, roleContext = null, title = null, subtitle = null }) => {
+const Login = ({ onSuccess, onRequireOtp, onForgotPassword, roleContext = null, title = null, subtitle = null }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -91,8 +91,19 @@ const Login = ({ onSuccess, onRequireOtp, roleContext = null, title = null, subt
           />
         </label>
 
-        <label className="block">
-          <span className="text-xs font-semibold text-slate-700 uppercase tracking-wider">Password</span>
+        <div>
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-slate-700 uppercase tracking-wider">Password</span>
+            {onForgotPassword && (
+              <button
+                type="button"
+                onClick={onForgotPassword}
+                className="text-xs font-bold text-sky-600 hover:text-sky-700 hover:underline cursor-pointer"
+              >
+                Forgot Password?
+              </button>
+            )}
+          </div>
           <input
             type="password"
             value={password}
@@ -101,7 +112,7 @@ const Login = ({ onSuccess, onRequireOtp, roleContext = null, title = null, subt
             placeholder="••••••••"
             className="mt-1 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-sky-500 focus:bg-white focus:ring-2 focus:ring-sky-100"
           />
-        </label>
+        </div>
 
         <button
           type="submit"

@@ -14,7 +14,7 @@ class PrescriptionItem extends Model
         'medicine_name',
         'dosage',
         'frequency',
-        'duration_days',
+        'duration',
         'instructions',
     ];
 

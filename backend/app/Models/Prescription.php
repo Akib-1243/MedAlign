@@ -13,7 +13,10 @@ class Prescription extends Model
         'token_id',
         'doctor_id',
         'patient_id',
+        'template_id',
         'notes',
+        'qr_code_path',
+        'pdf_path',
         'issued_at',
     ];
 

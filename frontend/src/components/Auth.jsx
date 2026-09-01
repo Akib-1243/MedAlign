@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import Login from './Login';
 import Register from './Register';
+import ForgotPassword from './ForgotPassword';
 import api from '../api';
 import MedAlignBrand from './MedAlignBrand';
 import { Stethoscope, UserRound, ShieldCheck, Building2 } from 'lucide-react';
@@ -11,7 +12,7 @@ const Auth = ({ onSuccess, onBack, defaultRole = null, lockRole = false }) => {
   const roleFromUrl = searchParams.get('role');
   const activeRole = defaultRole || roleFromUrl || 'patient';
 
-  const [mode, setMode] = useState('login'); // login | register | otp
+  const [mode, setMode] = useState('login'); // login | register | otp | forgot-password
   const [otpEmail, setOtpEmail] = useState('');
   const [otpType, setOtpType] = useState('registration');
   const [otpCode, setOtpCode] = useState('');
@@ -105,6 +106,15 @@ const Auth = ({ onSuccess, onBack, defaultRole = null, lockRole = false }) => {
 
   const portal = getPortalInfo(activeRole);
 
+  if (mode === 'forgot-password') {
+    return (
+      <ForgotPassword
+        onBack={() => setMode('login')}
+        onSuccessLogin={() => setMode('login')}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center p-6 bg-gradient-to-br from-slate-50 via-slate-100 to-white">
       <div className="w-full max-w-xl">
@@ -126,7 +136,7 @@ const Auth = ({ onSuccess, onBack, defaultRole = null, lockRole = false }) => {
         </div>
 
         <div className="bg-white/90 backdrop-blur-xl rounded-3xl border border-slate-200/80 shadow-2xl p-6 sm:p-8">
-          {mode !== 'otp' && (
+          {mode !== 'otp' && activeRole !== 'doctor' && (
             <div className="mb-6 flex gap-3 border-b border-slate-100 pb-4">
               <button
                 className={`px-5 py-2.5 rounded-full text-xs font-bold uppercase tracking-wider transition cursor-pointer ${
@@ -151,17 +161,27 @@ const Auth = ({ onSuccess, onBack, defaultRole = null, lockRole = false }) => {
             </div>
           )}
 
+          {activeRole === 'doctor' && mode !== 'otp' && (
+            <div className="mb-6 rounded-2xl bg-emerald-50/80 border border-emerald-200 p-3.5 text-xs text-emerald-900 flex items-center gap-2.5">
+              <Stethoscope className="h-4 w-4 text-emerald-700 shrink-0" />
+              <span>
+                <strong>Doctor Portal Access:</strong> Doctor accounts are provisioned exclusively by Clinic Administrators. Please sign in with your assigned credentials.
+              </span>
+            </div>
+          )}
+
           {mode === 'login' && (
             <Login
               onSuccess={onSuccess}
               onRequireOtp={handleRequireOtp}
+              onForgotPassword={() => setMode('forgot-password')}
               roleContext={activeRole}
               title={`Sign In to ${portal.title}`}
               subtitle={portal.subtitle}
             />
           )}
 
-          {mode === 'register' && (
+          {mode === 'register' && activeRole !== 'doctor' && (
             <Register
               onSuccess={onSuccess}
               onRequireOtp={handleRequireOtp}

@@ -35,6 +35,13 @@ class AuthController extends Controller
             ], 422);
         }
 
+        if ($request->role === 'doctor') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Doctor accounts can only be provisioned by a Clinic Administrator. Please contact your administrator to create your account.',
+            ], 403);
+        }
+
         // Check if user already exists
         $existingUser = User::where('email', $request->email)->first();
 

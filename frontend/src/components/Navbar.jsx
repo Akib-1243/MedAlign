@@ -115,9 +115,6 @@ function Navbar({ onLoginClick, onDoctorClick, onPatientClick, onContactClick, o
                     >
                       <DashboardIcon className="h-3.5 w-3.5 text-sky-600" /> {dashboardLabel}
                     </Link>
-                    <Link to="/patient" onClick={() => setOpen(false)} className="flex items-center gap-2 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 rounded-xl">
-                      <UserRound className="h-3.5 w-3.5 text-emerald-600" /> Patient Portal
-                    </Link>
                   </div>
                   <div className="mt-2 border-t border-slate-100 pt-2">
                     <button onClick={onLogout} className="w-full flex items-center gap-2 px-3 py-2 text-left text-xs font-bold text-red-600 hover:bg-red-50 rounded-xl cursor-pointer">

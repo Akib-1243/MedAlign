@@ -33,12 +33,12 @@ class PatientController extends Controller
         }
 
         // Calculate queue details
-        $currentlyServing = QueueToken::where('clinic_id', $token->clinic_id)
+        $currentlyServing = QueueToken::where('doctor_id', $token->doctor_id)
             ->where('status', 'called')
             ->orderBy('called_time', 'desc')
             ->first();
 
-        $patientsAhead = QueueToken::where('clinic_id', $token->clinic_id)
+        $patientsAhead = QueueToken::where('doctor_id', $token->doctor_id)
             ->where('status', 'waiting')
             ->where('token_id', '<', $token->token_id)
             ->count();
@@ -87,12 +87,12 @@ class PatientController extends Controller
         $currentlyServing = null;
 
         if ($latestToken) {
-            $patientsAhead = QueueToken::where('clinic_id', $latestToken->clinic_id)
+            $patientsAhead = QueueToken::where('doctor_id', $latestToken->doctor_id)
                 ->where('status', 'waiting')
                 ->where('token_id', '<', $latestToken->token_id)
                 ->count();
 
-            $servingToken = QueueToken::where('clinic_id', $latestToken->clinic_id)
+            $servingToken = QueueToken::where('doctor_id', $latestToken->doctor_id)
                 ->where('status', 'called')
                 ->first();
             $currentlyServing = $servingToken ? $servingToken->token_number : ($latestToken->token_number - 2 > 0 ? $latestToken->token_number - 2 : 101);
@@ -185,6 +185,106 @@ class PatientController extends Controller
         return response()->json([
             'success' => true,
             'data' => $prescription,
+        ]);
+    }
+
+    /**
+     * Public Doctors Directory Endpoint (backed by database `doctors`, `users`, `clinics` tables).
+     */
+    public function getDoctors()
+    {
+        $doctors = \App\Models\Doctor::with(['user', 'clinic'])->get()->map(function ($doc) {
+            return [
+                'id' => $doc->doctor_id,
+                'name' => $doc->user ? $doc->user->name : 'Dr. ' . $doc->specialization,
+                'specialty' => $doc->specialization,
+                'clinic' => $doc->clinic ? $doc->clinic->name : 'MedAlign Health Centre',
+                'experience' => ($doc->doctor_id * 2 + 5) . ' years experience',
+                'availability' => $doc->availability_status === 'available' ? 'Available today' : 'Unavailable',
+                'avg_consult_min' => $doc->avg_consult_min ?? 15,
+                'detail' => 'Specialist in ' . $doc->specialization . ' with digital queue roster integration.',
+            ];
+        });
+
+        return response()->json(['success' => true, 'data' => $doctors]);
+    }
+
+    /**
+     * Public Subscription Plans Endpoint (backed by database `subscription_plans` table).
+     */
+    public function getSubscriptionPlans()
+    {
+        $plans = DB::table('subscription_plans')->get();
+        return response()->json(['success' => true, 'data' => $plans]);
+    }
+
+    /**
+     * Issue/Book a new queue token for a selected doctor (backed by `queue_tokens` table).
+     */
+    public function issueToken(Request $request)
+    {
+        $doctorId = $request->input('doctor_id');
+        $patientId = $request->input('patient_id');
+        $patientName = $request->input('name');
+        $patientPhone = $request->input('phone');
+
+        if (!$patientId && ($patientPhone || $patientName)) {
+            $patient = Patient::firstOrCreate(
+                ['phone' => $patientPhone ?? '+1 555 0199'],
+                ['name' => $patientName ?? 'Patient', 'gender' => 'Other']
+            );
+            $patientId = $patient->patient_id;
+        }
+
+        if (!$patientId) {
+            $patient = Patient::first();
+            $patientId = $patient ? $patient->patient_id : 1;
+        }
+
+        $doctor = \App\Models\Doctor::with(['user', 'clinic'])->find($doctorId) ?? \App\Models\Doctor::with(['user', 'clinic'])->first();
+        $clinicId = $doctor ? $doctor->clinic_id : 1;
+
+        $lastTokenNum = DB::table('queue_tokens')
+            ->where('clinic_id', $clinicId)
+            ->max('token_number') ?? 100;
+
+        $nextTokenNum = $lastTokenNum + 1;
+
+        $patientsAhead = QueueToken::where('clinic_id', $clinicId)
+            ->where('status', 'waiting')
+            ->count();
+
+        $tokenId = DB::table('queue_tokens')->insertGetId([
+            'clinic_id' => $clinicId,
+            'doctor_id' => $doctor ? $doctor->doctor_id : null,
+            'patient_id' => $patientId,
+            'counter_id' => 1,
+            'token_number' => $nextTokenNum,
+            'status' => 'waiting',
+            'check_in_time' => now(),
+            'est_wait_time' => $patientsAhead * ($doctor ? $doctor->avg_consult_min : 15),
+        ]);
+
+        $token = QueueToken::with(['patient', 'doctor.user', 'doctor.clinic', 'counter'])
+            ->find($tokenId);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Queue token issued successfully!',
+            'token' => [
+                'token_id' => $token->token_id,
+                'token_number' => $token->token_number,
+                'clinic_name' => $token->doctor && $token->doctor->clinic ? $token->doctor->clinic->name : "MedAlign Health Centre",
+                'clinic_address' => $token->doctor && $token->doctor->clinic ? $token->doctor->clinic->address : "24 Crescent Road",
+                'doctor_name' => $token->doctor && $token->doctor->user ? $token->doctor->user->name : "Dr. Sarah Ahmed",
+                'specialization' => $token->doctor ? $token->doctor->specialization : "General Medicine",
+                'counter_name' => $token->counter ? $token->counter->counter_name : "Counter 1 (Room 101)",
+                'status' => $token->status,
+                'check_in_time' => $token->check_in_time ? $token->check_in_time->format('h:i A') : now()->format('h:i A'),
+                'patients_ahead' => $patientsAhead,
+                'currently_serving' => 101,
+                'est_wait_time' => $patientsAhead * 15,
+            ],
         ]);
     }
 }

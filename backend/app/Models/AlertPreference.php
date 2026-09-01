@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class AlertPreference extends Model
 {
-    protected $primaryKey = 'pref_id';
+    protected $primaryKey = 'preference_id';
     public $timestamps = false;
 
     protected $fillable = [

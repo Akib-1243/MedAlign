@@ -64,7 +64,7 @@ class DatabaseSeeder extends Seeder
 
         // ── 3. Admin User ──────────────────────────────────────────────────
         User::firstOrCreate(['email' => 'admin@medalign.test'], [
-            'name'              => 'Dr. Alexander Vance',
+            'name'              => 'Admin',
             'password'          => Hash::make('password'),
             'role'              => 'admin',
             'clinic_id'         => $mainClinic,
@@ -200,7 +200,7 @@ class DatabaseSeeder extends Seeder
                     'token_id'   => $tokenId,
                     'doctor_id'  => $assignedDoctorId,
                     'patient_id' => $pid,
-                    'notes'      => 'Patient responded well. Follow up in 2 weeks. Rest and hydration advised.',
+                    'notes'      => 'Patient responded well to respiratory therapy. Follow up in 2 weeks. Rest and hydration advised.',
                     'issued_at'  => now()->subMinutes(18),
                 ]);
                 DB::table('prescription_items')->insert([
@@ -211,19 +211,61 @@ class DatabaseSeeder extends Seeder
             }
         }
 
-        // Extra prescriptions (for vault demo — doctors 2 & 3, patients 6..11)
-        foreach ([1, 2] as $di) {
-            foreach ([5, 6, 7] as $pi) {
+        // ── 7b. Rich Multi-visit Clinical History for Patients (to test AI Synthesis) ──
+        // Patient 2 (Michael Chen - currently active in Doctor Consultation Desk)
+        $p2 = $patientIds[1] ?? 2;
+        $rxP2_1 = DB::table('prescriptions')->insertGetId([
+            'token_id'   => null,
+            'doctor_id'  => $doctorIds[0], // Dr. Sarah Ahmed (Cardiology)
+            'patient_id' => $p2,
+            'notes'      => 'Stage 1 Essential Hypertension diagnosed. Patient advised low-sodium diet and daily BP log.',
+            'issued_at'  => now()->subMonths(2),
+        ]);
+        DB::table('prescription_items')->insert([
+            ['prescription_id' => $rxP2_1, 'medicine_name' => 'Amlodipine 5mg', 'dosage' => '1 tablet', 'frequency' => 'Once daily (morning)', 'duration' => '60 days', 'instructions' => 'Take before breakfast with water.'],
+            ['prescription_id' => $rxP2_1, 'medicine_name' => 'Hydrochlorothiazide 12.5mg', 'dosage' => '1 tablet', 'frequency' => 'Once daily (morning)', 'duration' => '30 days', 'instructions' => 'Monitor potassium levels.'],
+        ]);
+
+        $rxP2_2 = DB::table('prescriptions')->insertGetId([
+            'token_id'   => null,
+            'doctor_id'  => $doctorIds[1], // Dr. James Okafor (Orthopedics)
+            'patient_id' => $p2,
+            'notes'      => 'Right knee strain from running. Swelling resolved with cold compression. Physiotherapy recommended.',
+            'issued_at'  => now()->subDays(21),
+        ]);
+        DB::table('prescription_items')->insert([
+            ['prescription_id' => $rxP2_2, 'medicine_name' => 'Ibuprofen 400mg', 'dosage' => '1 tablet', 'frequency' => 'Twice daily after meals', 'duration' => '5 days', 'instructions' => 'Take with full stomach.'],
+            ['prescription_id' => $rxP2_2, 'medicine_name' => 'Glucosamine Sulfate 1500mg', 'dosage' => '1 sachet', 'frequency' => 'Once daily', 'duration' => '30 days', 'instructions' => 'Dissolve in warm water.'],
+        ]);
+
+        // Patient 1 (Amina Yusuf)
+        $p1 = $patientIds[0] ?? 1;
+        $rxP1_1 = DB::table('prescriptions')->insertGetId([
+            'token_id'   => null,
+            'doctor_id'  => $doctorIds[0],
+            'patient_id' => $p1,
+            'notes'      => 'Mild sinus congestion and allergic rhinitis. Symptoms improving.',
+            'issued_at'  => now()->subMonths(1),
+        ]);
+        DB::table('prescription_items')->insert([
+            ['prescription_id' => $rxP1_1, 'medicine_name' => 'Cetirizine 10mg', 'dosage' => '1 tablet', 'frequency' => 'Once daily (night)', 'duration' => '14 days', 'instructions' => 'Avoid driving if drowsy.'],
+            ['prescription_id' => $rxP1_1, 'medicine_name' => 'Fluticasone Nasal Spray 50mcg', 'dosage' => '2 sprays each nostril', 'frequency' => 'Once daily', 'duration' => '30 days', 'instructions' => 'Shake well before use.'],
+        ]);
+
+        // Extra prescriptions for other patients
+        foreach ([1, 2, 3] as $di) {
+            foreach ([3, 4, 5, 6, 7] as $pi) {
+                if (!isset($patientIds[$pi])) continue;
                 $rxId = DB::table('prescriptions')->insertGetId([
                     'token_id'   => null,
                     'doctor_id'  => $doctorIds[$di],
                     'patient_id' => $patientIds[$pi],
-                    'notes'      => 'Routine follow-up. Continue current medications.',
-                    'issued_at'  => now()->subDays(rand(1, 14)),
+                    'notes'      => 'Routine follow-up consultation. Patient is adhering well to prescribed regimen.',
+                    'issued_at'  => now()->subDays(rand(5, 45)),
                 ]);
                 DB::table('prescription_items')->insert([
                     ['prescription_id' => $rxId, 'medicine_name' => 'Metformin 500mg',   'dosage' => '1 tablet', 'frequency' => 'Twice daily', 'duration' => '30 days', 'instructions' => 'With meals'],
-                    ['prescription_id' => $rxId, 'medicine_name' => 'Amlodipine 5mg',    'dosage' => '1 tablet', 'frequency' => 'Once daily',  'duration' => '30 days', 'instructions' => 'Morning'],
+                    ['prescription_id' => $rxId, 'medicine_name' => 'Atorvastatin 20mg', 'dosage' => '1 tablet', 'frequency' => 'Once daily (bedtime)',  'duration' => '30 days', 'instructions' => 'Take at night'],
                 ]);
             }
         }

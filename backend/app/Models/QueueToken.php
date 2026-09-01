@@ -18,7 +18,6 @@ class QueueToken extends Model
         'status',
         'check_in_time',
         'called_time',
-        'done_time',
         'completed_time',
         'est_wait_time',
     ];
@@ -26,7 +25,7 @@ class QueueToken extends Model
     protected $casts = [
         'check_in_time' => 'datetime',
         'called_time' => 'datetime',
-        'done_time' => 'datetime',
+        'completed_time' => 'datetime',
     ];
 
     public function patient()
