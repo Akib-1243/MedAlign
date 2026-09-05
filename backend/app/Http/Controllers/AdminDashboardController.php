@@ -3,169 +3,459 @@
 namespace App\Http\Controllers;
 
 use App\Http\Services\AdminDashboardService;
-use App\Models\Doctor;
-use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
 
 class AdminDashboardController extends Controller
 {
-    public function __construct(
-        private AdminDashboardService $dashboardService
-    ) {}
+    protected AdminDashboardService $dashboardService;
 
-    /** GET /admin/dashboard — KPI stats from DB */
+    public function __construct(AdminDashboardService $dashboardService)
+    {
+        $this->dashboardService = $dashboardService;
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Dashboard
+    |--------------------------------------------------------------------------
+    */
+
     public function index()
     {
-        return $this->dashboardService->getDashboardData();
+        $data = $this->dashboardService->getDashboardData();
+
+        return response()->json($data);
     }
 
-    /** GET /admin/doctors — list all doctors with user info */
-    public function listDoctors()
+
+    /*
+    |--------------------------------------------------------------------------
+    | Clinics / Hospitals
+    |--------------------------------------------------------------------------
+    */
+
+    public function listClinics()
     {
-        $doctors = Doctor::with(['user', 'clinic'])->get()->map(fn($d) => [
-            'doctor_id'           => $d->doctor_id,
-            'name'                => $d->user?->name ?? 'Unknown',
-            'email'               => $d->user?->email ?? '',
-            'phone'               => $d->user?->phone ?? '',
-            'specialization'      => $d->specialization,
-            'avg_consult_min'     => $d->avg_consult_min,
-            'availability_status' => $d->availability_status,
-            'clinic'              => $d->clinic?->name ?? 'Unassigned',
-            'clinic_id'           => $d->clinic_id,
-            'user_id'             => $d->user_id,
-            'verified'            => (bool) $d->user?->email_verified_at,
-        ]);
-
-        return response()->json(['success' => true, 'data' => $doctors]);
-    }
-
-    /** POST /admin/doctors — admin creates a new doctor account directly */
-    public function addDoctor(Request $request)
-    {
-        $data = $request->validate([
-            'name'           => 'required|string|max:100',
-            'email'          => 'required|email|unique:users,email',
-            'phone'          => 'nullable|string|max:20',
-            'password'       => 'required|string|min:6',
-            'specialization' => 'required|string|max:50',
-            'avg_consult_min'=> 'nullable|integer|min:5|max:60',
-            'clinic_id'      => 'nullable|integer|exists:clinics,clinic_id',
-        ]);
-
-        $clinicId = $data['clinic_id'] ?? DB::table('clinics')->value('clinic_id') ?? 1;
-
-        // Create user with role=doctor, pre-verified (admin-created accounts skip OTP)
-        $user = User::create([
-            'name'              => $data['name'],
-            'email'             => $data['email'],
-            'phone'             => $data['phone'] ?? null,
-            'password'          => Hash::make($data['password']),
-            'role'              => 'doctor',
-            'clinic_id'         => $clinicId,
-            'email_verified_at' => now(), // admin-created: skip OTP
-        ]);
-
-        // Provision doctor profile
-        $doctor = Doctor::create([
-            'user_id'             => $user->id,
-            'clinic_id'           => $clinicId,
-            'specialization'      => $data['specialization'],
-            'avg_consult_min'     => $data['avg_consult_min'] ?? 15,
-            'availability_status' => 'available',
-        ]);
+        $clinics = $this->dashboardService->getClinics();
 
         return response()->json([
-            'success' => true,
-            'message' => "Doctor account created successfully. {$data['name']} can now log in.",
-            'doctor'  => [
-                'doctor_id'      => $doctor->doctor_id,
-                'name'           => $user->name,
-                'email'          => $user->email,
-                'specialization' => $doctor->specialization,
-            ],
+            'clinics' => $clinics
+        ]);
+    }
+
+
+    public function clinicDetails($clinic_id)
+    {
+        $clinic = $this->dashboardService->getClinicDetails($clinic_id);
+
+        if (!$clinic) {
+            return response()->json([
+                'message' => 'Clinic not found.'
+            ], 404);
+        }
+
+        return response()->json([
+            'clinic' => $clinic
+        ]);
+    }
+
+
+    public function activateClinic($clinic_id)
+    {
+        $clinic = DB::table('clinics')
+            ->where('clinic_id', $clinic_id)
+            ->first();
+
+        if (!$clinic) {
+            return response()->json([
+                'message' => 'Clinic not found.'
+            ], 404);
+        }
+
+        DB::table('clinics')
+            ->where('clinic_id', $clinic_id)
+            ->update([
+                'status' => 'active'
+            ]);
+
+        return response()->json([
+            'message' => 'Clinic activated successfully.'
+        ]);
+    }
+
+
+    public function deactivateClinic($clinic_id)
+    {
+        $clinic = DB::table('clinics')
+            ->where('clinic_id', $clinic_id)
+            ->first();
+
+        if (!$clinic) {
+            return response()->json([
+                'message' => 'Clinic not found.'
+            ], 404);
+        }
+
+        DB::table('clinics')
+            ->where('clinic_id', $clinic_id)
+            ->update([
+                'status' => 'inactive'
+            ]);
+
+        return response()->json([
+            'message' => 'Clinic deactivated successfully.'
+        ]);
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Subscription Plans
+    |--------------------------------------------------------------------------
+    */
+
+    public function listSubscriptionPlans()
+    {
+        $plans = DB::table('subscription_plans')
+            ->orderBy('price', 'asc')
+            ->get();
+
+        return response()->json([
+            'plans' => $plans
+        ]);
+    }
+
+
+    public function addSubscriptionPlan(Request $request)
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|max:100',
+            'price' => 'required|numeric|min:0',
+            'billing_cycle' => 'required|in:monthly,yearly',
+            'max_doctors' => 'required|integer|min:1',
+            'features' => 'nullable|string',
+        ]);
+
+        $planId = DB::table('subscription_plans')->insertGetId([
+            'name' => $validated['name'],
+            'price' => $validated['price'],
+            'billing_cycle' => $validated['billing_cycle'],
+            'max_doctors' => $validated['max_doctors'],
+            'features' => $validated['features'] ?? null,
+        ]);
+
+        $plan = DB::table('subscription_plans')
+            ->where('plan_id', $planId)
+            ->first();
+
+        return response()->json([
+            'message' => 'Subscription plan created successfully.',
+            'plan' => $plan,
         ], 201);
     }
 
-    /** PATCH /admin/doctors/{doctor_id} — update doctor info / availability */
-    public function updateDoctor(Request $request, $doctor_id)
+
+    public function updateSubscriptionPlan(Request $request, $plan_id)
     {
-        $doctor = Doctor::with('user')->findOrFail($doctor_id);
+        $plan = DB::table('subscription_plans')
+            ->where('plan_id', $plan_id)
+            ->first();
 
-        $data = $request->validate([
-            'name'                => 'nullable|string|max:100',
-            'phone'               => 'nullable|string|max:20',
-            'specialization'      => 'nullable|string|max:50',
-            'avg_consult_min'     => 'nullable|integer|min:5|max:60',
-            'availability_status' => 'nullable|in:available,unavailable',
-        ]);
-
-        if ($doctor->user) {
-            $userUpdate = array_filter([
-                'name'  => $data['name'] ?? null,
-                'phone' => $data['phone'] ?? null,
-            ]);
-            if ($userUpdate) $doctor->user->update($userUpdate);
+        if (!$plan) {
+            return response()->json([
+                'message' => 'Subscription plan not found.'
+            ], 404);
         }
 
-        $doctorUpdate = array_filter([
-            'specialization'      => $data['specialization'] ?? null,
-            'avg_consult_min'     => $data['avg_consult_min'] ?? null,
-            'availability_status' => $data['availability_status'] ?? null,
+        $validated = $request->validate([
+            'name' => 'required|string|max:100',
+            'price' => 'required|numeric|min:0',
+            'billing_cycle' => 'required|in:monthly,yearly',
+            'max_doctors' => 'required|integer|min:1',
+            'features' => 'nullable|string',
         ]);
-        if ($doctorUpdate) $doctor->update($doctorUpdate);
 
-        return response()->json(['success' => true, 'message' => 'Doctor updated successfully.']);
+        DB::table('subscription_plans')
+            ->where('plan_id', $plan_id)
+            ->update([
+                'name' => $validated['name'],
+                'price' => $validated['price'],
+                'billing_cycle' => $validated['billing_cycle'],
+                'max_doctors' => $validated['max_doctors'],
+                'features' => $validated['features'] ?? null,
+            ]);
+
+        $updatedPlan = DB::table('subscription_plans')
+            ->where('plan_id', $plan_id)
+            ->first();
+
+        return response()->json([
+            'message' => 'Subscription plan updated successfully.',
+            'plan' => $updatedPlan,
+        ]);
     }
 
-    /** DELETE /admin/doctors/{doctor_id} — remove a doctor */
+
+    public function deleteSubscriptionPlan($plan_id)
+    {
+        $plan = DB::table('subscription_plans')
+            ->where('plan_id', $plan_id)
+            ->first();
+
+        if (!$plan) {
+            return response()->json([
+                'message' => 'Subscription plan not found.'
+            ], 404);
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Do not delete a plan that is currently assigned to a clinic.
+        |--------------------------------------------------------------------------
+        */
+
+        $clinicUsingPlan = DB::table('clinics')
+            ->where('plan_id', $plan_id)
+            ->exists();
+
+        if ($clinicUsingPlan) {
+            return response()->json([
+                'message' => 'This plan cannot be deleted because one or more clinics are currently using it.'
+            ], 422);
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Do not delete a plan that appears in invoice history.
+        |--------------------------------------------------------------------------
+        */
+
+        $planUsedInInvoices = DB::table('invoices')
+            ->where('plan_id', $plan_id)
+            ->exists();
+
+        if ($planUsedInInvoices) {
+            return response()->json([
+                'message' => 'This plan cannot be deleted because it is used in invoice history.'
+            ], 422);
+        }
+
+        DB::table('subscription_plans')
+            ->where('plan_id', $plan_id)
+            ->delete();
+
+        return response()->json([
+            'message' => 'Subscription plan deleted successfully.'
+        ]);
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Clinic Subscription
+    |--------------------------------------------------------------------------
+    */
+
+    public function clinicSubscription($clinic_id)
+    {
+        $clinic = DB::table('clinics as c')
+            ->leftJoin(
+                'subscription_plans as sp',
+                'c.plan_id',
+                '=',
+                'sp.plan_id'
+            )
+            ->where('c.clinic_id', $clinic_id)
+            ->select(
+                'c.clinic_id',
+                'c.name',
+                'c.status',
+                'c.plan_id',
+                'sp.name as plan_name',
+                'sp.price as plan_price',
+                'sp.billing_cycle',
+                'sp.max_doctors',
+                'sp.features'
+            )
+            ->first();
+
+        if (!$clinic) {
+            return response()->json([
+                'message' => 'Clinic not found.'
+            ], 404);
+        }
+
+        $invoices = DB::table('invoices')
+            ->where('clinic_id', $clinic_id)
+            ->orderByDesc('issued_date')
+            ->get();
+
+        return response()->json([
+            'clinic' => $clinic,
+            'invoices' => $invoices
+        ]);
+    }
+
+
+    public function updateClinicPlan(Request $request, $clinic_id)
+    {
+        $validated = $request->validate([
+            'plan_id' => 'required|exists:subscription_plans,plan_id',
+        ]);
+
+        $clinic = DB::table('clinics')
+            ->where('clinic_id', $clinic_id)
+            ->first();
+
+        if (!$clinic) {
+            return response()->json([
+                'message' => 'Clinic not found.'
+            ], 404);
+        }
+
+        DB::table('clinics')
+            ->where('clinic_id', $clinic_id)
+            ->update([
+                'plan_id' => $validated['plan_id']
+            ]);
+
+        $updatedClinic = DB::table('clinics as c')
+            ->leftJoin(
+                'subscription_plans as sp',
+                'c.plan_id',
+                '=',
+                'sp.plan_id'
+            )
+            ->where('c.clinic_id', $clinic_id)
+            ->select(
+                'c.clinic_id',
+                'c.name',
+                'c.status',
+                'c.plan_id',
+                'sp.name as plan_name',
+                'sp.price as plan_price',
+                'sp.billing_cycle',
+                'sp.max_doctors',
+                'sp.features'
+            )
+            ->first();
+
+        return response()->json([
+            'message' => 'Clinic subscription plan updated successfully.',
+            'clinic' => $updatedClinic
+        ]);
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Doctors
+    |--------------------------------------------------------------------------
+    */
+
+    public function listDoctors()
+    {
+        $doctors = $this->dashboardService->getDoctors();
+
+        return response()->json([
+            'doctors' => $doctors
+        ]);
+    }
+
+
+    public function addDoctor(Request $request)
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|max:100',
+            'email' => 'required|email',
+            'phone' => 'nullable|string|max:30',
+            'specialization' => 'required|string|max:100',
+            'clinic_id' => 'required|integer|exists:clinics,clinic_id',
+        ]);
+
+        $doctor = $this->dashboardService->addDoctor($validated);
+
+        return response()->json([
+            'message' => 'Doctor added successfully.',
+            'doctor' => $doctor
+        ], 201);
+    }
+
+
+    public function updateDoctor(Request $request, $doctor_id)
+    {
+        $validated = $request->validate([
+            'name' => 'sometimes|string|max:100',
+            'email' => 'sometimes|email',
+            'phone' => 'nullable|string|max:30',
+            'specialization' => 'sometimes|string|max:100',
+            'clinic_id' => 'sometimes|integer|exists:clinics,clinic_id',
+        ]);
+
+        $doctor = $this->dashboardService->updateDoctor(
+            $doctor_id,
+            $validated
+        );
+
+        if (!$doctor) {
+            return response()->json([
+                'message' => 'Doctor not found.'
+            ], 404);
+        }
+
+        return response()->json([
+            'message' => 'Doctor updated successfully.',
+            'doctor' => $doctor
+        ]);
+    }
+
+
     public function deleteDoctor($doctor_id)
     {
-        $doctor = Doctor::findOrFail($doctor_id);
-        $userId = $doctor->user_id;
-        $doctor->delete();
-        User::where('id', $userId)->delete();
+        $deleted = $this->dashboardService->deleteDoctor($doctor_id);
 
-        return response()->json(['success' => true, 'message' => 'Doctor removed from system.']);
+        if (!$deleted) {
+            return response()->json([
+                'message' => 'Doctor not found.'
+            ], 404);
+        }
+
+        return response()->json([
+            'message' => 'Doctor deleted successfully.'
+        ]);
     }
 
-    /** GET /admin/patients — list all patients */
+
+    /*
+    |--------------------------------------------------------------------------
+    | Patients
+    |--------------------------------------------------------------------------
+    */
+
     public function listPatients()
     {
-        $patients = DB::table('patients')
-            ->orderByDesc('patient_id')
-            ->limit(100)
-            ->get();
+        $patients = $this->dashboardService->getPatients();
 
-        return response()->json(['success' => true, 'data' => $patients]);
+        return response()->json([
+            'patients' => $patients
+        ]);
     }
 
-    /** GET /admin/queue — live queue monitor across all doctors */
+
+    /*
+    |--------------------------------------------------------------------------
+    | Live Queue
+    |--------------------------------------------------------------------------
+    */
+
     public function liveQueue()
     {
-        $tokens = DB::table('queue_tokens as qt')
-            ->leftJoin('patients as p', 'p.patient_id', '=', 'qt.patient_id')
-            ->leftJoin('doctors as d', 'd.doctor_id', '=', 'qt.doctor_id')
-            ->leftJoin('users as u', 'u.id', '=', 'd.user_id')
-            ->leftJoin('counters as c', 'c.counter_id', '=', 'qt.counter_id')
-            ->select([
-                'qt.token_id',
-                'qt.token_number',
-                'qt.status',
-                'qt.check_in_time',
-                'qt.called_time',
-                'qt.completed_time',
-                'p.name as patient_name',
-                'p.phone as patient_phone',
-                'u.name as doctor_name',
-                'd.specialization',
-                'c.counter_name',
-            ])
-            ->orderByDesc('qt.check_in_time')
-            ->limit(50)
-            ->get();
+        $queue = $this->dashboardService->getLiveQueue();
 
-        return response()->json(['success' => true, 'data' => $tokens]);
+        return response()->json([
+            'queue' => $queue
+        ]);
     }
 }
