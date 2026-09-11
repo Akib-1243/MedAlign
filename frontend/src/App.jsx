@@ -1,5 +1,12 @@
 import React, { useState } from "react";
-import { Navigate, Route, Routes, useNavigate } from "react-router-dom";
+
+import {
+  Navigate,
+  Route,
+  Routes,
+  useNavigate,
+} from "react-router-dom";
+
 import LandingPage from "./pages/LandingPage";
 import MarketingPage from "./pages/MarketingPage";
 import AdminDashboard from "./pages/AdminDashboard";
@@ -8,26 +15,46 @@ import DoctorsPage from "./pages/DoctorsPage";
 import ContactPage from "./pages/ContactPage";
 import GetStartedPage from "./pages/GetStartedPage";
 import PatientPage from "./pages/PatientPage";
+import ReceptionDashboard from "./pages/ReceptionDashboard";
+
 import Auth from "./components/Auth";
 import DoctorAuth from "./components/DoctorAuth";
 import AdminAuth from "./components/AdminAuth";
 import ForgotPassword from "./components/ForgotPassword";
 import ProtectedRoute from "./components/ProtectedRoute";
+
 import api from "./api";
 
-// Error Boundary to prevent blank white screens if any sub-component encounters an error
+/*
+|--------------------------------------------------------------------------
+| Error Boundary
+|--------------------------------------------------------------------------
+| Prevents a blank white screen if a component encounters an error.
+*/
+
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
-    this.state = { hasError: false, error: null };
+
+    this.state = {
+      hasError: false,
+      error: null,
+    };
   }
 
   static getDerivedStateFromError(error) {
-    return { hasError: true, error };
+    return {
+      hasError: true,
+      error,
+    };
   }
 
   componentDidCatch(error, errorInfo) {
-    console.error("ErrorBoundary caught an error:", error, errorInfo);
+    console.error(
+      "ErrorBoundary caught an error:",
+      error,
+      errorInfo
+    );
   }
 
   render() {
@@ -35,10 +62,15 @@ class ErrorBoundary extends React.Component {
       return (
         <div className="min-h-screen flex items-center justify-center bg-slate-50 p-6 text-center">
           <div className="max-w-md bg-white rounded-2xl shadow-xl p-8 border border-slate-200">
-            <h2 className="text-xl font-bold text-slate-900 mb-2">Something went wrong</h2>
+            <h2 className="text-xl font-bold text-slate-900 mb-2">
+              Something went wrong
+            </h2>
+
             <p className="text-sm text-slate-600 mb-4">
-              {this.state.error?.message || "An unexpected error occurred."}
+              {this.state.error?.message ||
+                "An unexpected error occurred."}
             </p>
+
             <button
               onClick={() => {
                 localStorage.clear();
@@ -52,19 +84,35 @@ class ErrorBoundary extends React.Component {
         </div>
       );
     }
+
     return this.props.children;
   }
 }
 
+/*
+|--------------------------------------------------------------------------
+| Main App
+|--------------------------------------------------------------------------
+*/
+
 function App() {
-  // Synchronous initialization from localStorage
+  /*
+  |--------------------------------------------------------------------------
+  | Authentication State
+  |--------------------------------------------------------------------------
+  */
+
   const [authenticated, setAuthenticated] = useState(() => {
     return Boolean(localStorage.getItem("access_token"));
   });
 
   const [user, setUser] = useState(() => {
     const raw = localStorage.getItem("user");
-    if (!raw) return null;
+
+    if (!raw) {
+      return null;
+    }
+
     try {
       return JSON.parse(raw);
     } catch {
@@ -74,9 +122,20 @@ function App() {
 
   const navigate = useNavigate();
 
-  const handleLoginSuccess = (token, userObj, redirectUrl) => {
+  /*
+  |--------------------------------------------------------------------------
+  | Login Success
+  |--------------------------------------------------------------------------
+  */
+
+  const handleLoginSuccess = (
+    token,
+    userObj,
+    redirectUrl
+  ) => {
     localStorage.setItem("access_token", token);
     localStorage.setItem("user", JSON.stringify(userObj));
+
     setAuthenticated(true);
     setUser(userObj);
 
@@ -88,78 +147,153 @@ function App() {
       navigate("/doctor");
     } else if (userObj?.role === "admin") {
       navigate("/admin");
+    } else if (userObj?.role === "reception") {
+      navigate("/reception");
     } else {
       navigate("/");
     }
   };
 
+  /*
+  |--------------------------------------------------------------------------
+  | Logout
+  |--------------------------------------------------------------------------
+  */
+
   const handleLogout = async () => {
     try {
       await api.post("/auth/logout");
     } catch {
-      // ignore network failure on logout; still clear local state
+      // Ignore network failure on logout.
+      // Local authentication state will still be cleared.
     }
+
     localStorage.removeItem("access_token");
     localStorage.removeItem("user");
+
     setAuthenticated(false);
     setUser(null);
+
     navigate("/");
   };
 
-  // Helper for role dashboard path
+  /*
+  |--------------------------------------------------------------------------
+  | Get Dashboard According to User Role
+  |--------------------------------------------------------------------------
+  */
+
   const getRoleDashboard = (role) => {
-    if (role === "admin") return "/admin";
-    if (role === "doctor") return "/doctor";
-    if (role === "patient") return "/patient";
+    if (role === "admin") {
+      return "/admin";
+    }
+
+    if (role === "doctor") {
+      return "/doctor";
+    }
+
+    if (role === "reception") {
+      return "/reception";
+    }
+
+    if (role === "patient") {
+      return "/patient";
+    }
+
     return "/";
   };
+
+  /*
+  |--------------------------------------------------------------------------
+  | Application Routes
+  |--------------------------------------------------------------------------
+  */
 
   return (
     <ErrorBoundary>
       <div className="med-theme-bg">
         <Routes>
-          {/* ── Public Routes ─────────────────────────────────────────────── */}
+
+          {/* ================================================================
+              PUBLIC ROUTES
+          ================================================================= */}
+
           <Route
             path="/"
             element={
               <LandingPage
                 onLoginClick={() => navigate("/auth")}
-                onMarketingClick={() => navigate("/marketing")}
-                onPatientClick={() => navigate(authenticated ? getRoleDashboard(user?.role) : "/patient")}
+
+                onMarketingClick={() =>
+                  navigate("/marketing")
+                }
+
+                onPatientClick={() =>
+                  navigate(
+                    authenticated
+                      ? getRoleDashboard(user?.role)
+                      : "/patient"
+                  )
+                }
+
                 onDoctorClick={() =>
                   navigate(
-                    authenticated && user?.role === "doctor"
+                    authenticated &&
+                      user?.role === "doctor"
                       ? "/doctor"
                       : "/doctor-auth"
                   )
                 }
-                onDoctorsClick={() => navigate("/doctors")}
-                onContactClick={() => navigate("/contact")}
-                onGetStarted={() => navigate("/get-started")}
+
+                onDoctorsClick={() =>
+                  navigate("/doctors")
+                }
+
+                onContactClick={() =>
+                  navigate("/contact")
+                }
+
+                onGetStarted={() =>
+                  navigate("/get-started")
+                }
+
                 authenticated={authenticated}
+
                 onLogout={handleLogout}
+
                 user={user}
               />
             }
           />
 
-          {/* Forgot Password Route */}
+          {/* ================================================================
+              FORGOT PASSWORD
+          ================================================================= */}
+
           <Route
             path="/forgot-password"
             element={
               <ForgotPassword
                 onBack={() => navigate("/")}
-                onSuccessLogin={() => navigate("/auth")}
+                onSuccessLogin={() =>
+                  navigate("/auth")
+                }
               />
             }
           />
 
-          {/* Patient Login & Registration (strictly role: patient) */}
+          {/* ================================================================
+              PATIENT LOGIN / REGISTRATION
+          ================================================================= */}
+
           <Route
             path="/auth"
             element={
               authenticated ? (
-                <Navigate to={getRoleDashboard(user?.role)} replace />
+                <Navigate
+                  to={getRoleDashboard(user?.role)}
+                  replace
+                />
               ) : (
                 <Auth
                   onSuccess={handleLoginSuccess}
@@ -171,12 +305,18 @@ function App() {
             }
           />
 
-          {/* Doctor Login & Registration (strictly role: doctor) */}
+          {/* ================================================================
+              DOCTOR LOGIN / REGISTRATION
+          ================================================================= */}
+
           <Route
             path="/doctor-auth"
             element={
               authenticated ? (
-                <Navigate to={getRoleDashboard(user?.role)} replace />
+                <Navigate
+                  to={getRoleDashboard(user?.role)}
+                  replace
+                />
               ) : (
                 <DoctorAuth
                   onSuccess={handleLoginSuccess}
@@ -185,17 +325,29 @@ function App() {
               )
             }
           />
+
           <Route
             path="/doctor/login"
-            element={<Navigate to="/doctor-auth" replace />}
+            element={
+              <Navigate
+                to="/doctor-auth"
+                replace
+              />
+            }
           />
 
-          {/* Admin Login (strictly role: admin via dedicated /admin/login link) */}
+          {/* ================================================================
+              ADMIN LOGIN
+          ================================================================= */}
+
           <Route
             path="/admin/login"
             element={
               authenticated ? (
-                <Navigate to={getRoleDashboard(user?.role)} replace />
+                <Navigate
+                  to={getRoleDashboard(user?.role)}
+                  replace
+                />
               ) : (
                 <AdminAuth
                   onSuccess={handleLoginSuccess}
@@ -204,49 +356,127 @@ function App() {
               )
             }
           />
+
           <Route
             path="/admin-auth"
-            element={<Navigate to="/admin/login" replace />}
+            element={
+              <Navigate
+                to="/admin/login"
+                replace
+              />
+            }
           />
+
+          {/* ================================================================
+              DOCTORS DIRECTORY
+          ================================================================= */}
 
           <Route
             path="/doctors"
             element={
               <DoctorsPage
                 onBack={() => navigate("/")}
-                onDoctorSignIn={() => navigate("/doctor-auth")}
+                onDoctorSignIn={() =>
+                  navigate("/doctor-auth")
+                }
               />
             }
           />
-          <Route path="/contact" element={<ContactPage onBack={() => navigate("/")} />} />
+
+          {/* ================================================================
+              CONTACT
+          ================================================================= */}
+
+          <Route
+            path="/contact"
+            element={
+              <ContactPage
+                onBack={() => navigate("/")}
+              />
+            }
+          />
+
+          {/* ================================================================
+              MARKETING
+          ================================================================= */}
+
           <Route
             path="/marketing"
             element={
               <MarketingPage
                 onBack={() => navigate("/")}
-                onPatientClick={() => navigate(authenticated ? getRoleDashboard(user?.role) : "/patient")}
-                onDoctorClick={() => navigate(authenticated ? getRoleDashboard(user?.role) : "/doctor")}
+
+                onPatientClick={() =>
+                  navigate(
+                    authenticated
+                      ? getRoleDashboard(user?.role)
+                      : "/patient"
+                  )
+                }
+
+                onDoctorClick={() =>
+                  navigate(
+                    authenticated
+                      ? getRoleDashboard(user?.role)
+                      : "/doctor"
+                  )
+                }
               />
             }
           />
+
+          {/* ================================================================
+              GET STARTED
+          ================================================================= */}
+
           <Route
             path="/get-started"
             element={
               <GetStartedPage
                 onBack={() => navigate("/")}
-                onLoginClick={() => navigate("/auth")}
-                onDoctorClick={() => navigate(authenticated && user?.role === "doctor" ? "/doctor" : "/doctor-auth")}
-                onPatientClick={() => navigate(authenticated ? getRoleDashboard(user?.role) : "/patient")}
-                onContactClick={() => navigate("/contact")}
-                onMarketingClick={() => navigate("/marketing")}
+
+                onLoginClick={() =>
+                  navigate("/auth")
+                }
+
+                onDoctorClick={() =>
+                  navigate(
+                    authenticated &&
+                      user?.role === "doctor"
+                      ? "/doctor"
+                      : "/doctor-auth"
+                  )
+                }
+
+                onPatientClick={() =>
+                  navigate(
+                    authenticated
+                      ? getRoleDashboard(user?.role)
+                      : "/patient"
+                  )
+                }
+
+                onContactClick={() =>
+                  navigate("/contact")
+                }
+
+                onMarketingClick={() =>
+                  navigate("/marketing")
+                }
+
                 authenticated={authenticated}
+
                 onLogout={handleLogout}
+
                 user={user}
               />
             }
           />
 
-          {/* ── Protected: Admin only (unauthenticated redirect -> /admin/login) ── */}
+          {/* ================================================================
+              PROTECTED: SYSTEM ADMIN
+          ================================================================= */}
+
           <Route
             path="/admin"
             element={
@@ -256,12 +486,19 @@ function App() {
                 allowedRoles={["admin"]}
                 loginPath="/admin/login"
               >
-                <AdminDashboard onBack={() => navigate("/")} onLogout={handleLogout} user={user} />
+                <AdminDashboard
+                  onBack={() => navigate("/")}
+                  onLogout={handleLogout}
+                  user={user}
+                />
               </ProtectedRoute>
             }
           />
 
-          {/* ── Protected: Doctor only (unauthenticated redirect -> /doctor-auth) ── */}
+          {/* ================================================================
+              PROTECTED: DOCTOR
+          ================================================================= */}
+
           <Route
             path="/doctor"
             element={
@@ -280,7 +517,32 @@ function App() {
             }
           />
 
-          {/* ── Protected: Patient Portal (unauthenticated redirect -> /auth) ── */}
+          {/* ================================================================
+              PROTECTED: RECEPTIONIST
+          ================================================================= */}
+
+          <Route
+            path="/reception"
+            element={
+              <ProtectedRoute
+                authenticated={authenticated}
+                user={user}
+                allowedRoles={["reception"]}
+                loginPath="/auth"
+              >
+                <ReceptionDashboard
+                  user={user}
+                  onLogout={handleLogout}
+                  onBack={() => navigate("/")}
+                />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* ================================================================
+              PROTECTED: PATIENT
+          ================================================================= */}
+
           <Route
             path="/patient"
             element={
@@ -294,14 +556,28 @@ function App() {
                   authenticated={authenticated}
                   user={user}
                   onLogout={handleLogout}
-                  onLoginClick={() => navigate("/auth")}
+                  onLoginClick={() =>
+                    navigate("/auth")
+                  }
                 />
               </ProtectedRoute>
             }
           />
 
-          {/* ── Catch-all ─────────────────────────────────────────────────── */}
-          <Route path="*" element={<Navigate to="/" replace />} />
+          {/* ================================================================
+              CATCH-ALL
+          ================================================================= */}
+
+          <Route
+            path="*"
+            element={
+              <Navigate
+                to="/"
+                replace
+              />
+            }
+          />
+
         </Routes>
       </div>
     </ErrorBoundary>
@@ -309,3 +585,4 @@ function App() {
 }
 
 export default App;
+
