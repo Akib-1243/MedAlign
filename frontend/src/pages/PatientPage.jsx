@@ -267,9 +267,9 @@ export default function PatientPage({ authenticated, user, onLogout, onLoginClic
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-slate-100 to-white text-slate-800">
       <Navbar authenticated={authenticated} user={user} onLogout={onLogout} onLoginClick={onLoginClick} />
 
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-28 pb-8 space-y-10">
         {/* Patient Profile Header */}
-        <section className="p-6 sm:p-8 rounded-3xl bg-white/90 backdrop-blur-xl border border-slate-200/80 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+        <section className="p-6 sm:p-8 rounded-3xl bg-white/95 backdrop-blur-xl border border-slate-200 shadow-xl ring-1 ring-white/80 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
           <div className="flex items-center gap-4">
             <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-sky-700 to-indigo-600 text-white flex items-center justify-center text-2xl font-bold shadow-lg shadow-sky-500/20">
               {patient.name.charAt(0)}

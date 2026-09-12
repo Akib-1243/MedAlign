@@ -18,7 +18,7 @@ const ROLE_DASHBOARDS = {
   admin: "/admin",
   doctor: "/doctor",
   patient: "/patient",
-  reception: "/admin",
+  reception: "/reception",
 };
 
 function ProtectedRoute({

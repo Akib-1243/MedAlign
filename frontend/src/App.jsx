@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 
 import {
   Navigate,
@@ -122,6 +122,29 @@ function App() {
 
   const navigate = useNavigate();
 
+  useEffect(() => {
+    const token = localStorage.getItem("access_token");
+
+    if (!token) {
+      return;
+    }
+
+    api.get("/auth/me")
+      .then((response) => {
+        const currentUser = response.data.user;
+
+        localStorage.setItem("user", JSON.stringify(currentUser));
+        setAuthenticated(true);
+        setUser(currentUser);
+      })
+      .catch(() => {
+        localStorage.removeItem("access_token");
+        localStorage.removeItem("user");
+        setAuthenticated(false);
+        setUser(null);
+      });
+  }, []);
+
   /*
   |--------------------------------------------------------------------------
   | Login Success
@@ -161,6 +184,10 @@ function App() {
   */
 
   const handleLogout = async () => {
+    const logoutPath = user?.role === "reception"
+      ? "/reception/login"
+      : "/auth";
+
     try {
       await api.post("/auth/logout");
     } catch {
@@ -174,7 +201,7 @@ function App() {
     setAuthenticated(false);
     setUser(null);
 
-    navigate("/");
+    navigate(logoutPath, { replace: true });
   };
 
   /*
@@ -368,6 +395,29 @@ function App() {
           />
 
           {/* ================================================================
+              RECEPTIONIST LOGIN / REGISTRATION
+          ================================================================= */}
+
+          <Route
+            path="/reception/login"
+            element={
+              authenticated ? (
+                <Navigate
+                  to={getRoleDashboard(user?.role)}
+                  replace
+                />
+              ) : (
+                <Auth
+                  onSuccess={handleLoginSuccess}
+                  onBack={() => navigate("/")}
+                  defaultRole="reception"
+                  lockRole={true}
+                />
+              )
+            }
+          />
+
+          {/* ================================================================
               DOCTORS DIRECTORY
           ================================================================= */}
 
@@ -528,7 +578,7 @@ function App() {
                 authenticated={authenticated}
                 user={user}
                 allowedRoles={["reception"]}
-                loginPath="/auth"
+                loginPath="/reception/login"
               >
                 <ReceptionDashboard
                   user={user}

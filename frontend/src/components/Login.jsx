@@ -17,6 +17,7 @@ const Login = ({ onSuccess, onRequireOtp, onForgotPassword, roleContext = null, 
       const response = await api.post('/auth/login', {
         email,
         password,
+        role: roleContext,
       });
 
       const { access_token, user, redirect_url } = response.data;

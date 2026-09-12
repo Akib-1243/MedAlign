@@ -121,6 +121,7 @@ class AuthController extends Controller
             'email' => 'required|email',
             'otp_code' => 'required|string|size:6',
             'type' => 'nullable|string|in:registration,login,password_reset',
+            'role' => ['nullable', Rule::in(['admin', 'doctor', 'reception', 'patient'])],
         ]);
 
         if ($validator->fails()) {
@@ -151,6 +152,13 @@ class AuthController extends Controller
         // Find and update user
         $user = User::where('email', $email)->first();
         if ($user) {
+            if ($request->filled('role') && $user->role !== $request->role) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'This account does not belong to the selected portal.',
+                ], 403);
+            }
+
             $user->email_verified_at = now();
             $user->save();
 
@@ -202,6 +210,7 @@ class AuthController extends Controller
         $validator = Validator::make($request->all(), [
             'email' => 'required|string',
             'password' => 'required|string',
+            'role' => ['nullable', Rule::in(['admin', 'doctor', 'reception', 'patient'])],
         ]);
 
         if ($validator->fails()) {
@@ -220,6 +229,13 @@ class AuthController extends Controller
                 'success' => false,
                 'message' => 'Invalid credentials.',
             ], 401);
+        }
+
+        if ($request->filled('role') && $user->role !== $request->role) {
+            return response()->json([
+                'success' => false,
+                'message' => 'These credentials are not registered for this portal.',
+            ], 403);
         }
 
         // Check if email is verified

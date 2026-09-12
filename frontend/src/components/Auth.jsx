@@ -38,6 +38,7 @@ const Auth = ({ onSuccess, onBack, defaultRole = null, lockRole = false }) => {
         email: otpEmail,
         otp_code: otpCode,
         type: otpType,
+        role: activeRole,
       });
 
       const { access_token, user, redirect_url } = response.data;
