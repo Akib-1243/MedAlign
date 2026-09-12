@@ -8,6 +8,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 
@@ -24,6 +25,8 @@ class AuthController extends Controller
             'email' => 'required|string|email|max:100',
             'phone' => 'nullable|string|max:20',
             'password' => 'required|string|min:6',
+            'password_confirmation' => 'required|string|same:password',
+            'terms_accepted' => 'accepted',
             'role' => ['required', Rule::in(['admin', 'doctor', 'reception', 'patient'])],
             'clinic_id' => 'nullable|integer|exists:clinics,clinic_id',
         ]);
@@ -121,6 +124,7 @@ class AuthController extends Controller
             'email' => 'required|email',
             'otp_code' => 'required|string|size:6',
             'type' => 'nullable|string|in:registration,login,password_reset',
+            'role' => ['nullable', Rule::in(['admin', 'doctor', 'reception', 'patient'])],
         ]);
 
         if ($validator->fails()) {
@@ -151,6 +155,13 @@ class AuthController extends Controller
         // Find and update user
         $user = User::where('email', $email)->first();
         if ($user) {
+            if ($request->filled('role') && $user->role !== $request->role) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'This account does not belong to the selected portal.',
+                ], 403);
+            }
+
             $user->email_verified_at = now();
             $user->save();
 
@@ -191,6 +202,7 @@ class AuthController extends Controller
             'token_type' => 'Bearer',
             'user' => $user->load(['clinic', 'doctor']),
             'redirect_url' => $this->getRoleRedirect($user->role),
+            'onboarding_required' => $this->clinicOnboardingRequired($user),
         ]);
     }
 
@@ -202,6 +214,7 @@ class AuthController extends Controller
         $validator = Validator::make($request->all(), [
             'email' => 'required|string',
             'password' => 'required|string',
+            'role' => ['nullable', Rule::in(['admin', 'doctor', 'reception', 'patient'])],
         ]);
 
         if ($validator->fails()) {
@@ -220,6 +233,13 @@ class AuthController extends Controller
                 'success' => false,
                 'message' => 'Invalid credentials.',
             ], 401);
+        }
+
+        if ($request->filled('role') && $user->role !== $request->role) {
+            return response()->json([
+                'success' => false,
+                'message' => 'These credentials are not registered for this portal.',
+            ], 403);
         }
 
         // Check if email is verified
@@ -245,6 +265,7 @@ class AuthController extends Controller
             'token_type' => 'Bearer',
             'user' => $user->load(['clinic', 'doctor']),
             'redirect_url' => $this->getRoleRedirect($user->role),
+            'onboarding_required' => $this->clinicOnboardingRequired($user),
         ]);
     }
 
@@ -256,6 +277,7 @@ class AuthController extends Controller
         return response()->json([
             'success' => true,
             'user' => $request->user()->load(['clinic', 'doctor']),
+            'onboarding_required' => $this->clinicOnboardingRequired($request->user()),
         ]);
     }
 
@@ -375,5 +397,14 @@ class AuthController extends Controller
             'patient' => '/patient',
             default => '/',
         };
+    }
+
+    private function clinicOnboardingRequired(User $user): bool
+    {
+        return $user->role === 'reception'
+            && !DB::table('clinic_verifications')
+                ->where('user_id', $user->id)
+                ->where('status', 'verified')
+                ->exists();
     }
 }

@@ -7,6 +7,7 @@ use App\Http\Controllers\DoctorDashboardController;
 use App\Http\Controllers\PatientController;
 use App\Http\Controllers\ReceptionDashboardController;
 use App\Http\Controllers\UsersController;
+use App\Http\Controllers\ClinicVerificationController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -239,6 +240,20 @@ Route::middleware(['jwt.auth', 'role:reception'])
             '/queue',
             [ReceptionDashboardController::class, 'queue']
         );
+    });
+
+Route::middleware(['jwt.auth', 'role:reception'])
+    ->prefix('clinic/verification')
+    ->group(function () {
+        Route::get('/', [ClinicVerificationController::class, 'show']);
+        Route::post('/', [ClinicVerificationController::class, 'submit']);
+    });
+
+Route::middleware(['jwt.auth', 'role:admin'])
+    ->prefix('admin/clinic-verifications')
+    ->group(function () {
+        Route::get('/', [ClinicVerificationController::class, 'index']);
+        Route::patch('/{verification_id}', [ClinicVerificationController::class, 'review']);
     });
 
 /*

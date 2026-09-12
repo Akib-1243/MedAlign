@@ -30,4 +30,9 @@ class Clinic extends Model
     {
         return $this->hasMany(Counter::class, 'clinic_id', 'clinic_id');
     }
+
+    public function verification()
+    {
+        return $this->hasOne(ClinicVerification::class, 'clinic_id', 'clinic_id');
+    }
 }

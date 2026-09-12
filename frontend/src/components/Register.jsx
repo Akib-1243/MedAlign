@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import api from '../api';
 import { UserRound, Stethoscope, ShieldCheck, Building2 } from 'lucide-react';
 
@@ -7,6 +8,8 @@ const Register = ({ onSuccess, onRequireOtp, initialRole = 'patient', lockRole =
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
+  const [passwordConfirmation, setPasswordConfirmation] = useState('');
+  const [termsAccepted, setTermsAccepted] = useState(false);
   const [role, setRole] = useState(initialRole || 'patient');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -22,12 +25,26 @@ const Register = ({ onSuccess, onRequireOtp, initialRole = 'patient', lockRole =
     setError('');
     setIsLoading(true);
 
+    if (password !== passwordConfirmation) {
+      setError('Passwords do not match.');
+      setIsLoading(false);
+      return;
+    }
+
+    if (!termsAccepted) {
+      setError('Please accept the Terms & Conditions to continue.');
+      setIsLoading(false);
+      return;
+    }
+
     try {
       const response = await api.post('/auth/register', {
         name,
         email,
         phone,
         password,
+        password_confirmation: passwordConfirmation,
+        terms_accepted: termsAccepted,
         role,
       });
 
@@ -86,7 +103,7 @@ const Register = ({ onSuccess, onRequireOtp, initialRole = 'patient', lockRole =
             value={name}
             onChange={(e) => setName(e.target.value)}
             required
-            placeholder={role === 'doctor' ? 'e.g. Dr. Sarah Ahmed' : 'e.g. Amina Yusuf'}
+            placeholder={role === 'reception' ? 'e.g. MedAlign Health Centre' : role === 'doctor' ? 'e.g. Dr. Sarah Ahmed' : 'e.g. Amina Yusuf'}
             className="mt-1 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-sky-500 focus:bg-white focus:ring-2 focus:ring-sky-100"
           />
         </label>
@@ -125,6 +142,29 @@ const Register = ({ onSuccess, onRequireOtp, initialRole = 'patient', lockRole =
             placeholder="••••••••"
             className="mt-1 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-sky-500 focus:bg-white focus:ring-2 focus:ring-sky-100"
           />
+        </label>
+
+        <label className="block">
+          <span className="text-xs font-semibold text-slate-700 uppercase tracking-wider">Confirm Password</span>
+          <input
+            type="password"
+            value={passwordConfirmation}
+            onChange={(e) => setPasswordConfirmation(e.target.value)}
+            required
+            minLength={6}
+            className="mt-1 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-sky-500 focus:bg-white focus:ring-2 focus:ring-sky-100"
+          />
+        </label>
+
+        <label className="flex items-start gap-2 text-xs text-slate-600">
+          <input type="checkbox" checked={termsAccepted} onChange={(e) => setTermsAccepted(e.target.checked)} className="mt-0.5" />
+          <span>
+            I accept the{' '}
+            <Link to="/terms" target="_blank" rel="noreferrer" className="font-bold text-sky-700 underline hover:text-sky-900">
+              Terms &amp; Conditions
+            </Link>{' '}
+            and confirm these details are accurate.
+          </span>
         </label>
 
         <button

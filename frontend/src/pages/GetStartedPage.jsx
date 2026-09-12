@@ -23,6 +23,8 @@ function GetStartedPage({
   onBack,
   onDoctorClick,
   onPatientClick,
+  onClinicStart,
+  onPatientStart,
   onLoginClick,
   onContactClick,
   onMarketingClick,
@@ -99,7 +101,7 @@ function GetStartedPage({
 
             <div className="mt-10 grid gap-6 sm:grid-cols-2">
               <button
-                onClick={() => choosePath("clinic")}
+                onClick={onClinicStart || (() => choosePath("clinic"))}
                 className="group rounded-3xl border border-slate-200 bg-white p-8 text-left shadow-sm transition hover:-translate-y-1 hover:border-sky-500 hover:shadow-xl cursor-pointer"
               >
                 <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-sky-50 text-sky-700 group-hover:bg-sky-600 group-hover:text-white transition">
@@ -111,7 +113,7 @@ function GetStartedPage({
               </button>
 
               <button
-                onClick={() => choosePath("patient")}
+                onClick={onPatientStart || (() => choosePath("patient"))}
                 className="group rounded-3xl border border-slate-200 bg-white p-8 text-left shadow-sm transition hover:-translate-y-1 hover:border-emerald-500 hover:shadow-xl cursor-pointer"
               >
                 <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-700 group-hover:bg-emerald-600 group-hover:text-white transition">

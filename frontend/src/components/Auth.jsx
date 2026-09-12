@@ -38,10 +38,11 @@ const Auth = ({ onSuccess, onBack, defaultRole = null, lockRole = false }) => {
         email: otpEmail,
         otp_code: otpCode,
         type: otpType,
+        role: activeRole,
       });
 
-      const { access_token, user, redirect_url } = response.data;
-      if (onSuccess) onSuccess(access_token, user, redirect_url);
+      const { access_token, user, redirect_url, onboarding_required } = response.data;
+      if (onSuccess) onSuccess(access_token, user, redirect_url, onboarding_required);
     } catch (err) {
       if (err.response && err.response.data && err.response.data.message) {
         setError(err.response.data.message);
