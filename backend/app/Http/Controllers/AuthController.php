@@ -8,6 +8,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 
@@ -24,6 +25,8 @@ class AuthController extends Controller
             'email' => 'required|string|email|max:100',
             'phone' => 'nullable|string|max:20',
             'password' => 'required|string|min:6',
+            'password_confirmation' => 'required|string|same:password',
+            'terms_accepted' => 'accepted',
             'role' => ['required', Rule::in(['admin', 'doctor', 'reception', 'patient'])],
             'clinic_id' => 'nullable|integer|exists:clinics,clinic_id',
         ]);
@@ -199,6 +202,7 @@ class AuthController extends Controller
             'token_type' => 'Bearer',
             'user' => $user->load(['clinic', 'doctor']),
             'redirect_url' => $this->getRoleRedirect($user->role),
+            'onboarding_required' => $this->clinicOnboardingRequired($user),
         ]);
     }
 
@@ -261,6 +265,7 @@ class AuthController extends Controller
             'token_type' => 'Bearer',
             'user' => $user->load(['clinic', 'doctor']),
             'redirect_url' => $this->getRoleRedirect($user->role),
+            'onboarding_required' => $this->clinicOnboardingRequired($user),
         ]);
     }
 
@@ -272,6 +277,7 @@ class AuthController extends Controller
         return response()->json([
             'success' => true,
             'user' => $request->user()->load(['clinic', 'doctor']),
+            'onboarding_required' => $this->clinicOnboardingRequired($request->user()),
         ]);
     }
 
@@ -391,5 +397,14 @@ class AuthController extends Controller
             'patient' => '/patient',
             default => '/',
         };
+    }
+
+    private function clinicOnboardingRequired(User $user): bool
+    {
+        return $user->role === 'reception'
+            && !DB::table('clinic_verifications')
+                ->where('user_id', $user->id)
+                ->where('status', 'verified')
+                ->exists();
     }
 }

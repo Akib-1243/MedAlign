@@ -20,13 +20,13 @@ const Login = ({ onSuccess, onRequireOtp, onForgotPassword, roleContext = null, 
         role: roleContext,
       });
 
-      const { access_token, user, redirect_url } = response.data;
+      const { access_token, user, redirect_url, onboarding_required } = response.data;
 
       setEmail('');
       setPassword('');
       setError('');
 
-      if (onSuccess) onSuccess(access_token, user, redirect_url);
+      if (onSuccess) onSuccess(access_token, user, redirect_url, onboarding_required);
     } catch (err) {
       if (err.response && err.response.data) {
         if (err.response.data.requires_otp) {

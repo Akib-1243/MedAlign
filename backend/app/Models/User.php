@@ -47,4 +47,9 @@ class User extends Authenticatable implements MustVerifyEmail
     {
         return $this->hasOne(Doctor::class, 'user_id', 'id');
     }
+
+    public function clinicVerification()
+    {
+        return $this->hasOne(ClinicVerification::class, 'user_id', 'id');
+    }
 }

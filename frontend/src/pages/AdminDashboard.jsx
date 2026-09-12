@@ -18,6 +18,7 @@ import {
   AlertCircle,
   Building2,
   CreditCard,
+  FileCheck2,
 } from "lucide-react";
 
 import api from "../api";
@@ -59,6 +60,11 @@ const TABS = [
     label: "Subscriptions & Billing",
     icon: <CreditCard className="h-4 w-4" />,
   },
+  {
+    id: "verifications",
+    label: "Clinic Verification",
+    icon: <FileCheck2 className="h-4 w-4" />,
+  },
 ];
 
 
@@ -77,6 +83,11 @@ function AdminDashboard({ onBack, onLogout }) {
   const [clinics, setClinics] = useState([]);
   const [loadingClinics, setLoadingClinics] = useState(false);
   const [clinicError, setClinicError] = useState("");
+
+  const [verifications, setVerifications] = useState([]);
+  const [loadingVerifications, setLoadingVerifications] = useState(false);
+  const [verificationError, setVerificationError] = useState("");
+  const [reviewingVerification, setReviewingVerification] = useState(null);
 
   // ── Subscription state ─────────────────────────────────────────────────
 
@@ -156,6 +167,41 @@ function AdminDashboard({ onBack, onLogout }) {
       );
     } finally {
       setLoadingClinics(false);
+    }
+  };
+
+  const fetchVerifications = async () => {
+    setLoadingVerifications(true);
+    setVerificationError("");
+
+    try {
+      const res = await api.get("/admin/clinic-verifications");
+      setVerifications(res.data.data || []);
+    } catch (e) {
+      setVerificationError(
+        e?.response?.data?.message || "Failed to load clinic verification records."
+      );
+    } finally {
+      setLoadingVerifications(false);
+    }
+  };
+
+  const reviewVerification = async (verificationId, status, reviewNotes) => {
+    setReviewingVerification(verificationId);
+    setVerificationError("");
+
+    try {
+      await api.patch(`/admin/clinic-verifications/${verificationId}`, {
+        status,
+        review_notes: reviewNotes,
+      });
+      await fetchVerifications();
+    } catch (e) {
+      setVerificationError(
+        e?.response?.data?.message || "Failed to update clinic verification."
+      );
+    } finally {
+      setReviewingVerification(null);
     }
   };
 
@@ -390,6 +436,10 @@ function AdminDashboard({ onBack, onLogout }) {
       fetchPlans();
     }
 
+    if (activeTab === "verifications") {
+      fetchVerifications();
+    }
+
   }, [activeTab]);
 
   // ── Derived values ─────────────────────────────────────────────────────
@@ -457,6 +507,10 @@ function AdminDashboard({ onBack, onLogout }) {
                       selectedClinic.clinic_id
                     );
                   }
+                }
+
+                if (activeTab === "verifications") {
+                  fetchVerifications();
                 }
 
               }}
@@ -970,6 +1024,7 @@ function AdminDashboard({ onBack, onLogout }) {
                         onClick={() =>
                           toggleClinicStatus(clinic)
                         }
+
                         className={`px-4 py-2 rounded-xl text-xs font-bold cursor-pointer ${
                           clinic.status === "active"
                             ? "border border-red-200 text-red-600 hover:bg-red-50"
@@ -989,6 +1044,49 @@ function AdminDashboard({ onBack, onLogout }) {
               </div>
             )}
 
+          </section>
+        )}
+
+        {/* ================================================================
+            CLINIC VERIFICATION TAB
+        ================================================================ */}
+
+        {activeTab === "verifications" && (
+          <section className="space-y-6">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <h2 className="text-2xl font-bold text-slate-950">Clinic Verification Review</h2>
+                <p className="mt-1 text-xs text-slate-500">Review the same verification records submitted by clinic hosts.</p>
+              </div>
+              <button onClick={fetchVerifications} className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer">
+                <RefreshCw className={`h-3.5 w-3.5 ${loadingVerifications ? "animate-spin" : ""}`} /> Refresh
+              </button>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-3">
+              <ReviewSummary label="Pending review" value={verifications.filter((item) => item.status === "pending_review").length} tone="amber" />
+              <ReviewSummary label="Verified clinics" value={verifications.filter((item) => item.status === "verified").length} tone="emerald" />
+              <ReviewSummary label="Needs attention" value={verifications.filter((item) => ["rejected", "expired"].includes(item.status)).length} tone="red" />
+            </div>
+
+            {verificationError && <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-700">{verificationError}</div>}
+
+            {loadingVerifications ? (
+              <div className="rounded-3xl border border-slate-200 bg-white p-10 text-center text-sm text-slate-500">Loading verification records...</div>
+            ) : verifications.length === 0 ? (
+              <div className="rounded-3xl border border-slate-200 bg-white p-10 text-center shadow-sm">
+                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600"><FileCheck2 className="h-7 w-7" /></div>
+                <h3 className="mt-4 text-lg font-bold text-slate-950">No clinic submissions yet</h3>
+                <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-slate-500">When a clinic host completes the verification form, the submission will appear here with its legal documents, facility details, operating information, and review status.</p>
+                <div className="mx-auto mt-6 grid max-w-2xl gap-3 text-left sm:grid-cols-3">
+                  <ReviewFeature icon={<Building2 className="h-4 w-4" />} text="Clinic identity and ownership" />
+                  <ReviewFeature icon={<FileCheck2 className="h-4 w-4" />} text="Licenses and certificates" />
+                  <ReviewFeature icon={<ShieldCheck className="h-4 w-4" />} text="Verified Clinic decision" />
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">{verifications.map((verification) => <VerificationReviewCard key={verification.verification_id} verification={verification} isSaving={reviewingVerification === verification.verification_id} onReview={reviewVerification} />)}</div>
+            )}
           </section>
         )}
 
@@ -1754,6 +1852,69 @@ function LiveDot() {
 
     </span>
   );
+}
+
+function VerificationReviewCard({ verification, isSaving, onReview }) {
+  const [status, setStatus] = useState(verification.status || "pending_review");
+  const [reviewNotes, setReviewNotes] = useState(verification.review_notes || "");
+  const documents = Object.keys(verification.documents || {});
+
+  return (
+    <article className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm lg:p-8">
+      <div className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-100 pb-5">
+        <div>
+          <div className="flex items-center gap-3">
+            <Building2 className="h-5 w-5 text-indigo-600" />
+            <h3 className="text-lg font-bold text-slate-950">{verification.clinic?.name || "Clinic submission"}</h3>
+            <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-bold uppercase text-amber-700">
+              {(verification.status || "pending_review").replaceAll("_", " ")}
+            </span>
+          </div>
+          <p className="mt-1 text-xs text-slate-500">Submitted {verification.submitted_at ? new Date(verification.submitted_at).toLocaleString() : "-"} by {verification.user?.email || "clinic representative"}</p>
+        </div>
+        <span className="text-xs font-semibold text-slate-500">Verification #{verification.verification_id}</span>
+      </div>
+
+      <div className="mt-5 grid gap-5 md:grid-cols-3 text-xs">
+        <Info label="Institution" value={verification.institution_type} />
+        <Info label="Official email" value={verification.clinic?.email || verification.representative_email} />
+        <Info label="Official phone" value={verification.clinic?.phone || verification.representative_phone} />
+        <Info label="Address" value={[verification.clinic?.address, verification.upazila, verification.district, verification.division].filter(Boolean).join(", ")} />
+        <Info label="Representative" value={`${verification.authorized_representative_name} · ${verification.representative_designation}`} />
+        <Info label="Ownership" value={`${verification.ownership_type} · ${verification.owner_organization_name}`} />
+      </div>
+
+      <div className="mt-6 grid gap-5 lg:grid-cols-2">
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <p className="text-xs font-bold uppercase tracking-wider text-slate-600">Submitted documents</p>
+          {documents.length ? <ul className="mt-3 space-y-2 text-xs text-slate-700">{documents.map((document) => <li key={document} className="flex items-center gap-2"><FileCheck2 className="h-3.5 w-3.5 text-emerald-600" />{document.replaceAll("_", " ")}</li>)}</ul> : <p className="mt-3 text-xs text-slate-500">No documents uploaded yet.</p>}
+        </div>
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <label className="block text-xs font-bold uppercase tracking-wider text-slate-600">Review status<select value={status} onChange={(event) => setStatus(event.target.value)} className="mt-2 w-full rounded-xl border border-slate-200 bg-white p-2.5 text-sm font-medium text-slate-800"><option value="pending_review">Pending Review</option><option value="verified">Verified</option><option value="rejected">Rejected</option><option value="expired">Expired</option></select></label>
+          <label className="mt-4 block text-xs font-bold uppercase tracking-wider text-slate-600">Review notes<textarea value={reviewNotes} onChange={(event) => setReviewNotes(event.target.value)} rows={3} className="mt-2 w-full rounded-xl border border-slate-200 bg-white p-2.5 text-sm font-normal text-slate-800" placeholder="Add a decision note or requested correction..." /></label>
+          <button disabled={isSaving} onClick={() => onReview(verification.verification_id, status, reviewNotes)} className="mt-4 inline-flex items-center gap-2 rounded-full bg-indigo-600 px-4 py-2.5 text-xs font-bold text-white hover:bg-indigo-700 disabled:opacity-50"><Save className="h-3.5 w-3.5" />{isSaving ? "Saving..." : "Save Review"}</button>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function Info({ label, value }) {
+  return <div><p className="font-bold uppercase tracking-wider text-slate-400">{label}</p><p className="mt-1 font-semibold text-slate-800">{value || "-"}</p></div>;
+}
+
+function ReviewSummary({ label, value, tone }) {
+  const tones = {
+    amber: "border-amber-200 bg-amber-50 text-amber-800",
+    emerald: "border-emerald-200 bg-emerald-50 text-emerald-800",
+    red: "border-red-200 bg-red-50 text-red-800",
+  };
+
+  return <div className={`rounded-2xl border p-4 ${tones[tone]}`}><p className="text-xs font-semibold">{label}</p><p className="mt-1 text-2xl font-extrabold">{value}</p></div>;
+}
+
+function ReviewFeature({ icon, text }) {
+  return <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs font-semibold text-slate-700">{icon}{text}</div>;
 }
 
 export default AdminDashboard;

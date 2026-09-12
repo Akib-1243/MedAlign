@@ -16,6 +16,8 @@ import ContactPage from "./pages/ContactPage";
 import GetStartedPage from "./pages/GetStartedPage";
 import PatientPage from "./pages/PatientPage";
 import ReceptionDashboard from "./pages/ReceptionDashboard";
+import ClinicVerificationPage from "./pages/ClinicVerificationPage";
+import TermsAndConditions from "./pages/TermsAndConditions";
 
 import Auth from "./components/Auth";
 import DoctorAuth from "./components/DoctorAuth";
@@ -120,6 +122,8 @@ function App() {
     }
   });
 
+  const [onboardingRequired, setOnboardingRequired] = useState(false);
+
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -136,12 +140,14 @@ function App() {
         localStorage.setItem("user", JSON.stringify(currentUser));
         setAuthenticated(true);
         setUser(currentUser);
+        setOnboardingRequired(Boolean(response.data.onboarding_required));
       })
       .catch(() => {
         localStorage.removeItem("access_token");
         localStorage.removeItem("user");
         setAuthenticated(false);
         setUser(null);
+        setOnboardingRequired(false);
       });
   }, []);
 
@@ -154,15 +160,19 @@ function App() {
   const handleLoginSuccess = (
     token,
     userObj,
-    redirectUrl
+    redirectUrl,
+    onboardingRequired = false
   ) => {
     localStorage.setItem("access_token", token);
     localStorage.setItem("user", JSON.stringify(userObj));
 
     setAuthenticated(true);
     setUser(userObj);
+    setOnboardingRequired(Boolean(onboardingRequired));
 
-    if (redirectUrl) {
+    if (onboardingRequired && userObj?.role === "reception") {
+      navigate("/clinic/verification");
+    } else if (redirectUrl) {
       navigate(redirectUrl);
     } else if (userObj?.role === "patient") {
       navigate("/patient");
@@ -200,6 +210,7 @@ function App() {
 
     setAuthenticated(false);
     setUser(null);
+    setOnboardingRequired(false);
 
     navigate(logoutPath, { replace: true });
   };
@@ -309,6 +320,11 @@ function App() {
             }
           />
 
+          <Route
+            path="/terms"
+            element={<TermsAndConditions />}
+          />
+
           {/* ================================================================
               PATIENT LOGIN / REGISTRATION
           ================================================================= */}
@@ -403,7 +419,7 @@ function App() {
             element={
               authenticated ? (
                 <Navigate
-                  to={getRoleDashboard(user?.role)}
+                  to={onboardingRequired && user?.role === "reception" ? "/clinic/verification" : getRoleDashboard(user?.role)}
                   replace
                 />
               ) : (
@@ -414,6 +430,23 @@ function App() {
                   lockRole={true}
                 />
               )
+            }
+          />
+
+          <Route
+            path="/clinic/verification"
+            element={
+              <ProtectedRoute
+                authenticated={authenticated}
+                user={user}
+                allowedRoles={["reception"]}
+                loginPath="/reception/login"
+              >
+                <ClinicVerificationPage
+                  user={user}
+                  onLogout={handleLogout}
+                />
+              </ProtectedRoute>
             }
           />
 
@@ -506,6 +539,10 @@ function App() {
                   )
                 }
 
+                onClinicStart={() => navigate("/reception/login")}
+
+                onPatientStart={() => navigate("/auth")}
+
                 onContactClick={() =>
                   navigate("/contact")
                 }
@@ -574,18 +611,22 @@ function App() {
           <Route
             path="/reception"
             element={
-              <ProtectedRoute
-                authenticated={authenticated}
-                user={user}
-                allowedRoles={["reception"]}
-                loginPath="/reception/login"
-              >
-                <ReceptionDashboard
+              onboardingRequired && user?.role === "reception" ? (
+                <Navigate to="/clinic/verification" replace />
+              ) : (
+                <ProtectedRoute
+                  authenticated={authenticated}
                   user={user}
-                  onLogout={handleLogout}
-                  onBack={() => navigate("/")}
-                />
-              </ProtectedRoute>
+                  allowedRoles={["reception"]}
+                  loginPath="/reception/login"
+                >
+                  <ReceptionDashboard
+                    user={user}
+                    onLogout={handleLogout}
+                    onBack={() => navigate("/")}
+                  />
+                </ProtectedRoute>
+              )
             }
           />
 
