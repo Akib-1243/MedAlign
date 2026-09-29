@@ -6,6 +6,13 @@ on:
   pull_request:
     branches: [ "main", "master" ]
 
+permissions:
+  contents: read
+
+concurrency:
+  group: medalign-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   # ----------------------------------------------------
   # JOB 1: Laravel Backend & MySQL Tests (runs inside ./backend)
@@ -28,20 +35,24 @@ jobs:
 
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup PHP Environment
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.4'
-          extensions: mbstring, dom, fileinfo, mysql, pdo, pdo_mysql, bcmath, ctype, json, openssl, tokenizer, xml
+          php-version: '8.2'
+          extensions: mbstring, dom, fileinfo, pdo_mysql, bcmath, ctype, json, openssl, tokenizer, xml
           coverage: none
+          tools: composer:v2
 
       - name: Copy .env file for Testing
         run: php -r "file_exists('.env') || copy('.env.example', '.env');"
 
       - name: Install Composer Dependencies
-        run: composer install --prefer-dist --no-interaction --no-progress
+        run: composer install --prefer-dist --no-interaction --no-progress --optimize-autoloader
+
+      - name: Validate Composer Configuration
+        run: composer validate --no-check-publish
 
       - name: Generate Laravel Application Key
         run: php artisan key:generate
@@ -80,15 +91,17 @@ jobs:
 
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
-          node-version: '20'
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
 
       - name: Install NPM Dependencies
-        run: npm ci || npm install
+        run: npm ci
 
       - name: Build React Production Assets
         run: npm run build
