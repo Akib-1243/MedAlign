@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Services\QueueNotificationService;
+use App\Http\Services\TelegramService;
 use App\Models\AlertPreference;
 use App\Models\Patient;
 use App\Models\Prescription;
@@ -53,6 +55,10 @@ class PatientController extends Controller
                 'patients_ahead' => $patientsAhead,
                 'est_wait_time' => $estWaitMinutes,
                 'currently_serving' => $currentlyServing ? $currentlyServing->token_number : null,
+                'telegram' => [
+                    'linked' => (bool) $token->patient?->telegram_chat_id,
+                    'bot_link' => app(TelegramService::class)->botLink(),
+                ],
             ],
         ]);
     }
@@ -114,6 +120,10 @@ class PatientController extends Controller
             'patients_ahead' => $patientsAhead,
             'currently_serving' => $currentlyServing,
             'alert_preferences' => $alerts,
+            'telegram' => [
+                'linked' => (bool) $patient->telegram_chat_id,
+                'bot_link' => app(TelegramService::class)->botLink(),
+            ],
         ]);
     }
 
@@ -144,6 +154,7 @@ class PatientController extends Controller
         $alerts->update([
             'sms_enabled' => $request->input('sms_enabled', $alerts->sms_enabled),
             'whatsapp_enabled' => $request->input('whatsapp_enabled', $alerts->whatsapp_enabled),
+            'telegram_enabled' => $request->input('telegram_enabled', $alerts->telegram_enabled),
             'near_turn_threshold' => $request->input('near_turn_threshold', $alerts->near_turn_threshold),
         ]);
 
@@ -267,6 +278,8 @@ class PatientController extends Controller
 
         $token = QueueToken::with(['patient', 'doctor.user', 'doctor.clinic', 'counter'])
             ->find($tokenId);
+
+        app(QueueNotificationService::class)->notifyNearTurn($token->doctor_id);
 
         return response()->json([
             'success' => true,

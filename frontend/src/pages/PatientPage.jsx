@@ -60,6 +60,8 @@ export default function PatientPage({ authenticated, user, onLogout, onLoginClic
   // Alert Settings
   const [smsAlert, setSmsAlert] = useState(true);
   const [whatsappAlert, setWhatsappAlert] = useState(true);
+  const [telegramAlert, setTelegramAlert] = useState(true);
+  const [telegram, setTelegram] = useState({ linked: false, bot_link: null });
   const [alertThreshold, setAlertThreshold] = useState(3);
   const [alertSavedToast, setAlertSavedToast] = useState(false);
 
@@ -102,6 +104,9 @@ export default function PatientPage({ authenticated, user, onLogout, onLoginClic
             currently_serving: tokenRes.data.data.currently_serving ?? 101,
             est_wait_time: tokenRes.data.data.est_wait_time ?? 0,
           });
+          if (tokenRes.data.data.telegram) {
+            setTelegram(tokenRes.data.data.telegram);
+          }
           if (t.patient) {
             setPatient(t.patient);
             if (t.patient.patient_id) fetchVault(t.patient.patient_id);
@@ -140,7 +145,11 @@ export default function PatientPage({ authenticated, user, onLogout, onLoginClic
         if (res.data.alert_preferences) {
           setSmsAlert(Boolean(res.data.alert_preferences.sms_enabled));
           setWhatsappAlert(Boolean(res.data.alert_preferences.whatsapp_enabled));
+          setTelegramAlert(res.data.alert_preferences.telegram_enabled ?? true);
           setAlertThreshold(res.data.alert_preferences.near_turn_threshold || 3);
+        }
+        if (res.data.telegram) {
+          setTelegram(res.data.telegram);
         }
         if (res.data.patient?.patient_id) {
           fetchVault(res.data.patient.patient_id);
@@ -225,6 +234,7 @@ export default function PatientPage({ authenticated, user, onLogout, onLoginClic
       await api.post(`/patient/${patient.patient_id}/alerts`, {
         sms_enabled: smsAlert,
         whatsapp_enabled: whatsappAlert,
+        telegram_enabled: telegramAlert,
         near_turn_threshold: alertThreshold,
       });
     } catch (e) {
@@ -748,6 +758,38 @@ export default function PatientPage({ authenticated, user, onLogout, onLoginClic
                     onChange={(e) => setWhatsappAlert(e.target.checked)}
                     className="w-5 h-5 accent-emerald-600 cursor-pointer"
                   />
+                </div>
+
+                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-sky-100 text-sky-700 flex items-center justify-center"><Send className="w-5 h-5" /></div>
+                      <div>
+                        <p className="text-sm font-bold text-slate-900">Telegram Alerts</p>
+                        <p className="text-xs text-slate-500">
+                          {telegram.linked
+                            ? "Connected. You'll be messaged when your turn is near and when you're called."
+                            : `Not connected yet. Open our bot and share ${patient.phone} to start receiving alerts.`}
+                        </p>
+                      </div>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={telegramAlert}
+                      onChange={(e) => setTelegramAlert(e.target.checked)}
+                      className="w-5 h-5 accent-sky-600 cursor-pointer"
+                    />
+                  </div>
+                  {!telegram.linked && telegram.bot_link && (
+                    <a
+                      href={telegram.bot_link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-sky-600 text-white text-xs font-bold hover:bg-sky-500"
+                    >
+                      <Send className="w-4 h-4" /> Connect Telegram
+                    </a>
+                  )}
                 </div>
 
                 <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Services\QueueNotificationService;
 use App\Models\Doctor;
 use App\Models\QueueToken;
 use Illuminate\Http\Request;
@@ -82,6 +83,10 @@ class DoctorDashboardController extends Controller
             'called_time' => now(),
         ]);
 
+        $notifier = app(QueueNotificationService::class);
+        $notifier->notifyCalled($token);
+        $notifier->notifyNearTurn($token->doctor_id);
+
         return response()->json(['current' => $this->token($token->load('patient'))]);
     }
 
@@ -100,6 +105,12 @@ class DoctorDashboardController extends Controller
         }
 
         $token->update($updateData);
+
+        $notifier = app(QueueNotificationService::class);
+        if ($status === 'called') {
+            $notifier->notifyCalled($token);
+        }
+        $notifier->notifyNearTurn($token->doctor_id);
 
         return response()->json([
             'message' => 'Queue updated.',
