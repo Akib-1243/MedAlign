@@ -20,7 +20,7 @@ The backend is fully prepared for RESTful API development, and students are expe
 
 Make sure you have the following installed:
 
-- PHP >= 8.1
+- PHP >= 8.4
 - Composer
 - MySQL / PostgreSQL / SQLite
 - Node.js and npm/yarn (for the frontend client)

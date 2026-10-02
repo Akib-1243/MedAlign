@@ -18,7 +18,7 @@ jobs:
   # JOB 1: Laravel Backend & MySQL Tests (runs inside ./backend)
   # ----------------------------------------------------
   laravel-backend:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: ./backend
@@ -40,7 +40,7 @@ jobs:
       - name: Setup PHP Environment
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.2'
+          php-version: '8.4'
           extensions: mbstring, dom, fileinfo, pdo_mysql, bcmath, ctype, json, openssl, tokenizer, xml
           coverage: none
           tools: composer:v2
@@ -84,7 +84,7 @@ jobs:
   # JOB 2: React Frontend Build (runs inside ./frontend)
   # ----------------------------------------------------
   react-frontend:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: ./frontend
@@ -96,7 +96,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v5
         with:
-          node-version: '24'
+          node-version: '24.19.0'
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
