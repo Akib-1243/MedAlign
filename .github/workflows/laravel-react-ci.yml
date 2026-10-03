@@ -162,7 +162,20 @@ jobs:
             sudo docker compose exec -T app php artisan config:cache
             sudo docker compose exec -T app php artisan route:cache
 
-            echo "==> Reloading host Nginx..."
+            echo "==> Ensuring SSL cert exists..."
+            mkdir -p ~/ssl_certs
+            if [ ! -f ~/ssl_certs/fullchain.pem ]; then
+              openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+                -keyout ~/ssl_certs/privkey.pem \
+                -out ~/ssl_certs/fullchain.pem \
+                -subj "/C=BD/ST=Dhaka/L=Dhaka/O=AUST/OU=CSE/CN=medalign.austattendance.online" \
+                -addext "subjectAltName=DNS:medalign.austattendance.online"
+              echo "Self-signed SSL cert generated."
+            else
+              echo "SSL cert already exists, skipping."
+            fi
+
+            echo "==> Deploying host Nginx config..."
             sudo cp ${{ secrets.VPS_PROJECT_PATH }}/nginx-proxy/medalign.conf /etc/nginx/sites-available/medalign.conf
             sudo ln -sf /etc/nginx/sites-available/medalign.conf /etc/nginx/sites-enabled/medalign.conf
             sudo /usr/sbin/nginx -t
