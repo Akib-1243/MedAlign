@@ -73,7 +73,7 @@ services:
     networks:
       - medalign-network
 
-  # ─── React Frontend (Vite development server) ────────────────────────────────
+  # ─── React Frontend (Nginx serving Vite production build) ───────────────────
   frontend:
     build:
       context: ./frontend
@@ -82,12 +82,7 @@ services:
     container_name: medalign_frontend
     restart: unless-stopped
     ports:
-      - "5173:5173"
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-    environment:
-      VITE_API_BASE_URL: http://localhost:8000/api
+      - "5173:80" # Nginx inside container serves on 80, exposed as 5173
     depends_on:
       - web
     networks:
