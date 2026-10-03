@@ -126,26 +126,31 @@ jobs:
           script: |
             set -e
 
+            echo "==> Pulling latest code via Docker git..."
+            sudo docker run --rm \
+              -v ${{ secrets.VPS_PROJECT_PATH }}:${{ secrets.VPS_PROJECT_PATH }} \
+              alpine/git \
+              -c safe.directory=${{ secrets.VPS_PROJECT_PATH }} \
+              -C ${{ secrets.VPS_PROJECT_PATH }} \
+              pull origin main
+
             echo "==> Navigating to project directory"
             cd ${{ secrets.VPS_PROJECT_PATH }}
 
-            echo "==> Pulling latest code from GitHub"
-            git pull origin ${{ github.ref_name }}
-
             echo "==> Rebuilding and restarting Docker containers"
-            docker compose up --build -d --remove-orphans
+            sudo docker compose up --build -d --remove-orphans
 
             echo "==> Waiting for DB to be healthy..."
-            sleep 15
+            sleep 30
 
             echo "==> Running Laravel migrations"
-            docker compose exec -T app php artisan migrate --force
+            sudo docker compose exec -T app php artisan migrate --force
 
             echo "==> Clearing and warming up Laravel caches"
-            docker compose exec -T app php artisan config:clear
-            docker compose exec -T app php artisan route:clear
-            docker compose exec -T app php artisan view:clear
-            docker compose exec -T app php artisan config:cache
-            docker compose exec -T app php artisan route:cache
+            sudo docker compose exec -T app php artisan config:clear
+            sudo docker compose exec -T app php artisan route:clear
+            sudo docker compose exec -T app php artisan view:clear
+            sudo docker compose exec -T app php artisan config:cache
+            sudo docker compose exec -T app php artisan route:cache
 
             echo "==> Deployment complete!"
