@@ -163,7 +163,10 @@ jobs:
             sudo docker compose exec -T app php artisan route:cache
 
             echo "==> Reloading host Nginx..."
-            sudo systemctl reload nginx || true
+            sudo cp ${{ secrets.VPS_PROJECT_PATH }}/nginx-proxy/medalign.conf /etc/nginx/sites-available/medalign.conf
+            sudo ln -sf /etc/nginx/sites-available/medalign.conf /etc/nginx/sites-enabled/medalign.conf
+            sudo /usr/sbin/nginx -t
+            sudo systemctl reload nginx
 
             echo ""
             echo "==> Live at: https://medalign.austattendance.online"
