@@ -34,7 +34,7 @@ class DatabaseSeeder extends Seeder
             DB::table($t)->truncate();
         }
 
-        User::whereIn('role', ['admin', 'doctor', 'reception'])->delete();
+        User::whereIn('role', ['admin', 'doctor', 'reception', 'patient'])->delete();
 
         DB::statement('SET FOREIGN_KEY_CHECKS=1;');
 
@@ -94,6 +94,27 @@ User::firstOrCreate(['email' => 'reception@medalign.test'], [
     'clinic_id'         => $mainClinic,
     'email_verified_at' => now(),
 ]);
+
+        // ── 3c. Patient User (Demo Account) ───────────────────────────────
+        User::firstOrCreate(['email' => 'patient@medalign.test'], [
+            'name'              => 'Amina Yusuf',
+            'first_name'        => 'Amina',
+            'last_name'         => 'Yusuf',
+            'phone'             => '+1 555 0101',
+            'password'          => Hash::make('password'),
+            'role'              => 'patient',
+            'email_verified_at' => now(),
+        ]);
+
+        User::firstOrCreate(['email' => 'amina@test.org'], [
+            'name'              => 'Amina Yusuf',
+            'first_name'        => 'Amina',
+            'last_name'         => 'Yusuf',
+            'phone'             => '+1 555 0101',
+            'password'          => Hash::make('password'),
+            'role'              => 'patient',
+            'email_verified_at' => now(),
+        ]);
 
         // ── 4. Doctors ────────────────────────────────────────────────────
 
