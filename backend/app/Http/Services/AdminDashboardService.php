@@ -73,11 +73,11 @@ class AdminDashboardService
             'analytics_days' => DB::table('daily_analytics')->count(),
         ];
 
-        return response()->json([
+        return [
             'queue_snapshot' => $queueSnapshot,
             'doctor_activity' => $doctorActivity,
             'subscription_status' => $subscriptionStatus,
             'analytics' => $analytics,
-        ]);
+        ];
     }
 }

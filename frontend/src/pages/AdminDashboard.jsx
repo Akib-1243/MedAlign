@@ -19,6 +19,7 @@ import {
   Building2,
   CreditCard,
   FileCheck2,
+  Download,
 } from "lucide-react";
 
 import api from "../api";
@@ -67,6 +68,17 @@ const TABS = [
   },
 ];
 
+const VERIFICATION_DOCUMENTS = [
+  ["dghs_license_document", "DGHS Private Clinic / Hospital License"],
+  ["trade_license_document", "Trade License"],
+  ["tin_certificate", "TIN Certificate"],
+  ["bin_vat_certificate", "BIN / VAT Certificate"],
+  ["environmental_clearance_document", "Environmental Clearance"],
+  ["fire_clearance_document", "Fire Service / Civil Defence Clearance"],
+  ["waste_management_document", "Waste Management Agreement"],
+  ["narcotics_permit_document", "Narcotics Permit"],
+];
+
 
 // ─── Main Component ─────────────────────────────────────────────────────────
 
@@ -76,6 +88,7 @@ function AdminDashboard({ onBack, onLogout }) {
   // ── Stats state ────────────────────────────────────────────────────────
 
   const [dashboard, setDashboard] = useState(null);
+  const [dashboardError, setDashboardError] = useState("");
   const [loadingStats, setLoadingStats] = useState(true);
 
   // ── Clinics state ──────────────────────────────────────────────────────
@@ -115,38 +128,18 @@ function AdminDashboard({ onBack, onLogout }) {
 
   const fetchStats = async () => {
     setLoadingStats(true);
+    setDashboardError("");
 
     try {
       const res = await api.get("/admin/dashboard-stats");
-
-      setDashboard(res.data);
-    } catch {
-      setDashboard({
-        queue_snapshot: {
-          waiting: 0,
-          called: 0,
-          completed: 0,
-          total: 0,
-        },
-
-        doctor_activity: {
-          total_doctors: 0,
-          available: 0,
-          unavailable: 0,
-        },
-
-        subscription_status: {
-          active_clinics: 0,
-          inactive_clinics: 0,
-        },
-
-        analytics: {
-          total_patients: 0,
-          average_wait_time: 0,
-          average_walkout_rate: 0,
-          analytics_days: 0,
-        },
-      });
+      const data = res.data?.original || res.data;
+      if (!data?.queue_snapshot || !data?.doctor_activity || !data?.subscription_status || !data?.analytics) {
+        throw new Error("The dashboard response is missing required data.");
+      }
+      setDashboard(data);
+    } catch (error) {
+      setDashboard(null);
+      setDashboardError(error?.response?.data?.message || error?.message || "Unable to load live dashboard data.");
     } finally {
       setLoadingStats(false);
     }
@@ -454,7 +447,7 @@ function AdminDashboard({ onBack, onLogout }) {
       ? Math.round(
           (da.available / da.total_doctors) * 100
         )
-      : 0;
+      : null;
 
 
   // ── Render ─────────────────────────────────────────────────────────────
@@ -566,6 +559,14 @@ function AdminDashboard({ onBack, onLogout }) {
 
         {activeTab === "stats" && (
           <>
+            {dashboardError && (
+              <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+                <span>{dashboardError} The dashboard values are not available until the backend responds.</span>
+                <button onClick={fetchStats} disabled={loadingStats} className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-white px-3 py-2 text-xs font-semibold text-red-800 hover:bg-red-100 disabled:opacity-50">
+                  <RefreshCw className={`h-3.5 w-3.5 ${loadingStats ? "animate-spin" : ""}`} /> Retry
+                </button>
+              </div>
+            )}
             {/* KPIs */}
 
             <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -574,23 +575,23 @@ function AdminDashboard({ onBack, onLogout }) {
                 icon={<Clock3 />}
                 tone="amber"
                 label="Live Waiting Queue"
-                value={qs.waiting ?? 0}
-                sub={`${qs.total ?? 0} total tokens registered`}
+                value={qs.waiting ?? "—"}
+                sub={`${qs.total ?? "—"} total tokens registered`}
               />
 
               <KPICard
                 icon={<Stethoscope />}
                 tone="green"
                 label="Active Clinicians"
-                value={da.available ?? 0}
-                sub={`${da.total_doctors ?? 0} doctors rostered`}
+                value={da.available ?? "—"}
+                sub={`${da.total_doctors ?? "—"} doctors rostered`}
               />
 
               <KPICard
                 icon={<TrendingUp />}
                 tone="sky"
                 label="Avg Wait Time"
-                value={`${an.average_wait_time ?? 0}m`}
+                value={an.average_wait_time === undefined ? "—" : `${an.average_wait_time}m`}
                 sub="Average wait duration"
               />
 
@@ -598,7 +599,7 @@ function AdminDashboard({ onBack, onLogout }) {
                 icon={<Activity />}
                 tone="purple"
                 label="Walkout Rate"
-                value={`${an.average_walkout_rate ?? 0}%`}
+                value={an.average_walkout_rate === undefined ? "—" : `${an.average_walkout_rate}%`}
                 sub="Real-time target metric"
               />
 
@@ -618,11 +619,11 @@ function AdminDashboard({ onBack, onLogout }) {
                     </h2>
 
                     <p className="text-xs text-slate-500 mt-0.5">
-                      Real-time status across all counters
+                      Queue counts from the latest database snapshot
                     </p>
                   </div>
 
-                  <LiveDot />
+                  <LiveDot isLive={Boolean(dashboard) && !dashboardError} />
 
                 </div>
 
@@ -632,7 +633,7 @@ function AdminDashboard({ onBack, onLogout }) {
                     color="bg-amber-500"
                     label="Waiting in Lobby"
                     sub="Awaiting consultation"
-                    value={qs.waiting ?? 0}
+                    value={qs.waiting ?? "—"}
                     bg="border-amber-100 bg-amber-50/40"
                     valueColor="text-amber-700"
                   />
@@ -641,7 +642,7 @@ function AdminDashboard({ onBack, onLogout }) {
                     color="bg-sky-500"
                     label="In Consultation"
                     sub="Currently called with doctor"
-                    value={qs.called ?? 0}
+                    value={qs.called ?? "—"}
                     bg="border-sky-100 bg-sky-50/40"
                     valueColor="text-sky-700"
                   />
@@ -650,7 +651,7 @@ function AdminDashboard({ onBack, onLogout }) {
                     color="bg-emerald-500"
                     label="Completed Encounters"
                     sub="Consultation finished"
-                    value={qs.completed ?? 0}
+                    value={qs.completed ?? "—"}
                     bg="border-emerald-100 bg-emerald-50/40"
                     valueColor="text-emerald-700"
                   />
@@ -683,14 +684,14 @@ function AdminDashboard({ onBack, onLogout }) {
                   <RosterRow
                     icon={
                       <span className="text-emerald-700 font-bold text-sm">
-                        {da.available ?? 0}
+                        {da.available ?? "—"}
                       </span>
                     }
                     label="Available Doctors"
                     sub="Ready for consultation"
                     badge={
-                      <span className="text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full">
-                        Active
+                      <span className={`rounded-full border px-2.5 py-0.5 text-xs font-bold ${!dashboard ? "border-slate-200 bg-slate-100 text-slate-500" : da.available > 0 ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-amber-200 bg-amber-50 text-amber-800"}`}>
+                        {!dashboard ? "Unavailable" : da.available > 0 ? "Clinicians available" : "None available"}
                       </span>
                     }
                   />
@@ -698,14 +699,14 @@ function AdminDashboard({ onBack, onLogout }) {
                   <RosterRow
                     icon={
                       <span className="text-blue-700 font-bold text-sm">
-                        {da.total_doctors ?? 0}
+                        {da.total_doctors ?? "—"}
                       </span>
                     }
                     label="Total Registered Doctors"
                     sub="Department roster"
                     badge={
                       <span className="text-sm font-bold text-slate-700">
-                        {doctorPct}% Online
+                        {doctorPct === null ? "—" : `${doctorPct}% Online`}
                       </span>
                     }
                   />
@@ -713,14 +714,14 @@ function AdminDashboard({ onBack, onLogout }) {
                   <RosterRow
                     icon={
                       <span className="text-slate-600 font-bold text-sm">
-                        {da.unavailable ?? 0}
+                        {da.unavailable ?? "—"}
                       </span>
                     }
                     label="Off-duty / On Break"
                     sub="Currently unavailable"
                     badge={
                       <span className="text-xs text-slate-400">
-                        Standby
+                        {!dashboard ? "—" : da.unavailable > 0 ? "Off duty" : "None"}
                       </span>
                     }
                   />
@@ -758,7 +759,7 @@ function AdminDashboard({ onBack, onLogout }) {
 
                   <div className="rounded-2xl bg-emerald-50/70 border border-emerald-200/60 p-4 text-center">
                     <p className="text-2xl font-extrabold text-emerald-700">
-                      {sub.active_clinics ?? 0}
+                      {sub.active_clinics ?? "—"}
                     </p>
 
                     <p className="mt-1 text-xs text-slate-600 font-medium">
@@ -768,7 +769,7 @@ function AdminDashboard({ onBack, onLogout }) {
 
                   <div className="rounded-2xl bg-amber-50/70 border border-amber-200/60 p-4 text-center">
                     <p className="text-2xl font-extrabold text-amber-700">
-                      {sub.inactive_clinics ?? 0}
+                      {sub.inactive_clinics ?? "—"}
                     </p>
 
                     <p className="mt-1 text-xs text-slate-600 font-medium">
@@ -778,13 +779,11 @@ function AdminDashboard({ onBack, onLogout }) {
 
                   <div className="rounded-2xl bg-sky-50/70 border border-sky-200/60 p-4 text-center">
                     <p className="text-2xl font-extrabold text-sky-700">
-                      {sub.active_clinics !== undefined
-                        ? "Multi"
-                        : "—"}
+                      {sub.total_clinics ?? "—"}
                     </p>
 
                     <p className="mt-1 text-xs text-slate-600 font-medium">
-                      Facility Network
+                      Total Clinics
                     </p>
                   </div>
 
@@ -801,7 +800,7 @@ function AdminDashboard({ onBack, onLogout }) {
                     </h2>
 
                     <p className="text-xs text-slate-500 mt-0.5">
-                      {an.analytics_days ?? 0}-day operational aggregate
+                      {an.analytics_days ?? "—"}-day operational aggregate
                     </p>
                   </div>
 
@@ -813,26 +812,17 @@ function AdminDashboard({ onBack, onLogout }) {
 
                   <ProgressBar
                     label="Service Efficiency Rating"
-                    value={Math.max(
-                      0,
-                      100 -
-                        (an.average_walkout_rate ?? 0)
-                    )}
+                    value={dashboard ? Math.max(0, 100 - an.average_walkout_rate) : null}
                     color="from-sky-500 to-indigo-600"
                     textColor="text-sky-700"
                   />
 
                   <ProgressBar
                     label="Wait Threshold (Max 30m)"
-                    value={Math.min(
-                      100,
-                      ((an.average_wait_time ?? 0) /
-                        30) *
-                        100
-                    )}
+                    value={dashboard ? Math.min(100, (an.average_wait_time / 30) * 100) : null}
                     color="from-emerald-400 to-emerald-600"
                     textColor="text-emerald-700"
-                    suffix={`${an.average_wait_time ?? 0} min`}
+                    suffix={dashboard ? `${an.average_wait_time} min` : "Data unavailable"}
                   />
 
                   <div className="pt-2 flex justify-between text-xs text-slate-500 border-t border-slate-100">
@@ -840,14 +830,14 @@ function AdminDashboard({ onBack, onLogout }) {
                     <span>
                       Total patients evaluated:{" "}
                       <strong className="text-slate-800">
-                        {an.total_patients ?? 0}
+                        {an.total_patients ?? "—"}
                       </strong>
                     </span>
 
                     <span>
                       Days monitored:{" "}
                       <strong className="text-slate-800">
-                        {an.analytics_days ?? 0}
+                        {an.analytics_days ?? "—"}
                       </strong>
                     </span>
 
@@ -1809,6 +1799,8 @@ function ProgressBar({
   textColor,
   suffix,
 }) {
+  const hasValue = Number.isFinite(value);
+
   return (
     <div>
 
@@ -1819,7 +1811,7 @@ function ProgressBar({
         </span>
 
         <span className={`font-bold ${textColor}`}>
-          {suffix || `${Math.round(value)}%`}
+          {suffix || (hasValue ? `${Math.round(value)}%` : "—")}
         </span>
 
       </div>
@@ -1829,10 +1821,10 @@ function ProgressBar({
         <div
           className={`h-2 rounded-full bg-gradient-to-r ${color}`}
           style={{
-            width: `${Math.max(
+            width: `${hasValue ? Math.max(
               0,
               Math.min(100, value)
-            )}%`,
+            ) : 0}%`,
           }}
         />
 
@@ -1842,13 +1834,13 @@ function ProgressBar({
   );
 }
 
-function LiveDot() {
+function LiveDot({ isLive }) {
   return (
     <span className="flex h-3 w-3 relative">
 
-      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+      {isLive && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />}
 
-      <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500" />
+      <span className={`relative inline-flex h-3 w-3 rounded-full ${isLive ? "bg-emerald-500" : "bg-slate-300"}`} />
 
     </span>
   );
@@ -1857,7 +1849,37 @@ function LiveDot() {
 function VerificationReviewCard({ verification, isSaving, onReview }) {
   const [status, setStatus] = useState(verification.status || "pending_review");
   const [reviewNotes, setReviewNotes] = useState(verification.review_notes || "");
-  const documents = Object.keys(verification.documents || {});
+  const [downloadingDocument, setDownloadingDocument] = useState("");
+  const [documentError, setDocumentError] = useState("");
+  const operating = verification.operating_information || {};
+  const documents = verification.documents || {};
+  const enabledServices = Object.entries(verification.services || {})
+    .filter(([, enabled]) => enabled === true || enabled === 1 || enabled === "1")
+    .map(([key]) => key.replaceAll("_", " "));
+
+  const downloadDocument = async (documentKey) => {
+    setDownloadingDocument(documentKey);
+    setDocumentError("");
+    try {
+      const response = await api.get(
+        `/admin/clinic-verifications/${verification.verification_id}/documents/${documentKey}`,
+        { responseType: "blob" }
+      );
+      const objectUrl = URL.createObjectURL(response.data);
+      const link = document.createElement("a");
+      const contentDisposition = response.headers["content-disposition"] || "";
+      link.href = objectUrl;
+      link.download = contentDisposition.match(/filename="?([^";]+)"?/i)?.[1] || documentKey;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+    } catch {
+      setDocumentError("Unable to download this document. Refresh the review and try again.");
+    } finally {
+      setDownloadingDocument("");
+    }
+  };
 
   return (
     <article className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm lg:p-8">
@@ -1875,32 +1897,110 @@ function VerificationReviewCard({ verification, isSaving, onReview }) {
         <span className="text-xs font-semibold text-slate-500">Verification #{verification.verification_id}</span>
       </div>
 
-      <div className="mt-5 grid gap-5 md:grid-cols-3 text-xs">
-        <Info label="Institution" value={verification.institution_type} />
-        <Info label="Official email" value={verification.clinic?.email || verification.representative_email} />
-        <Info label="Official phone" value={verification.clinic?.phone || verification.representative_phone} />
-        <Info label="Address" value={[verification.clinic?.address, verification.upazila, verification.district, verification.division].filter(Boolean).join(", ")} />
-        <Info label="Representative" value={`${verification.authorized_representative_name} · ${verification.representative_designation}`} />
-        <Info label="Ownership" value={`${verification.ownership_type} · ${verification.owner_organization_name}`} />
+      <div className="divide-y divide-slate-100">
+        <DetailSection title="Clinic information">
+          <div className="grid gap-x-6 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">
+            <Info label="Official clinic / hospital name" value={verification.clinic?.name} />
+            <Info label="Institution type" value={verification.institution_type} />
+            <Info label="Bangla name" value={verification.bangla_name} />
+            <Info label="Year established" value={verification.year_established} />
+            <Info label="Official email" value={verification.clinic?.email} />
+            <Info label="Official phone" value={verification.clinic?.phone} />
+            <Info label="Website" value={verification.website} />
+            <Info label="Ownership type" value={verification.ownership_type} />
+            <Info label="Owner / organization" value={verification.owner_organization_name} />
+            <Info label="Street address" value={verification.clinic?.address} />
+            <Info label="Division" value={verification.division} />
+            <Info label="District" value={verification.district} />
+            <Info label="Upazila / Thana" value={verification.upazila} />
+            <Info label="Postal code" value={verification.postal_code} />
+          </div>
+        </DetailSection>
+
+        <DetailSection title="Authorized representative">
+          <div className="grid gap-x-6 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">
+            <Info label="Name" value={verification.authorized_representative_name} />
+            <Info label="Designation" value={verification.representative_designation} />
+            <Info label="Phone" value={verification.representative_phone} />
+            <Info label="Email" value={verification.representative_email} />
+            <Info label="Submitted by" value={verification.user?.name} />
+            <Info label="Account email" value={verification.user?.email} />
+          </div>
+        </DetailSection>
+
+        <DetailSection title="Legal and government registration">
+          <div className="grid gap-x-6 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">
+            <Info label="DGHS license number" value={verification.dghs_license_number} />
+            <Info label="Trade license number" value={verification.trade_license_number} />
+            <Info label="TIN" value={verification.tin} />
+            <Info label="BIN / VAT number" value={verification.bin_vat_number} />
+          </div>
+        </DetailSection>
+
+        <DetailSection title="Facility and services">
+          <div className="grid gap-x-6 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">
+            <Info label="Licensed bed count" value={verification.licensed_bed_count} />
+            <Info label="Current bed count" value={verification.current_bed_count} />
+            <Info label="Submitted services" value={enabledServices.length ? enabledServices.join(", ") : "No services selected"} />
+          </div>
+        </DetailSection>
+
+        <DetailSection title="Operating information">
+          <div className="grid gap-x-6 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">
+            <Info label="OPD operating hours" value={operating.opd_hours} />
+            <Info label="Emergency hours" value={operating.emergency_hours} />
+            <Info label="Weekly closing day" value={operating.weekly_closing_day} />
+            <Info label="Consultation / appointment information" value={operating.consultation_information} className="sm:col-span-2 lg:col-span-3" />
+          </div>
+        </DetailSection>
+
+        <DetailSection title="Submitted documents">
+          <p className="mb-3 text-xs text-slate-500">Every requested document is listed below. Files marked “Not uploaded” were not included in this submission.</p>
+          <div className="divide-y divide-slate-100 rounded-xl border border-slate-200">
+            {VERIFICATION_DOCUMENTS.map(([key, label]) => {
+              const uploaded = Boolean(documents[key]);
+              return (
+                <div key={key} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+                  <div className="flex min-w-0 items-center gap-3">
+                    {uploaded ? <FileCheck2 className="h-4 w-4 shrink-0 text-emerald-600" /> : <AlertCircle className="h-4 w-4 shrink-0 text-amber-600" />}
+                    <span className="text-sm font-medium text-slate-800">{label}</span>
+                  </div>
+                  {uploaded ? (
+                    <button type="button" onClick={() => downloadDocument(key)} disabled={downloadingDocument === key} className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-sky-700 hover:bg-sky-50 disabled:opacity-50">
+                      <Download className="h-3.5 w-3.5" />{downloadingDocument === key ? "Preparing..." : "Download"}
+                    </button>
+                  ) : (
+                    <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800">Not uploaded</span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          {documentError && <p role="alert" className="mt-3 text-xs font-medium text-red-700">{documentError}</p>}
+        </DetailSection>
       </div>
 
-      <div className="mt-6 grid gap-5 lg:grid-cols-2">
-        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-          <p className="text-xs font-bold uppercase tracking-wider text-slate-600">Submitted documents</p>
-          {documents.length ? <ul className="mt-3 space-y-2 text-xs text-slate-700">{documents.map((document) => <li key={document} className="flex items-center gap-2"><FileCheck2 className="h-3.5 w-3.5 text-emerald-600" />{document.replaceAll("_", " ")}</li>)}</ul> : <p className="mt-3 text-xs text-slate-500">No documents uploaded yet.</p>}
+      <div className="mt-6 grid gap-5 rounded-2xl bg-slate-50 p-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-wider text-slate-600">Review decision</p>
+          <label className="mt-3 block text-xs font-semibold text-slate-700">Status<select value={status} onChange={(event) => setStatus(event.target.value)} className="mt-2 w-full rounded-xl border border-slate-200 bg-white p-2.5 text-sm font-medium text-slate-800"><option value="pending_review">Pending Review</option><option value="verified">Verified</option><option value="rejected">Rejected</option><option value="expired">Expired</option></select></label>
         </div>
-        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-          <label className="block text-xs font-bold uppercase tracking-wider text-slate-600">Review status<select value={status} onChange={(event) => setStatus(event.target.value)} className="mt-2 w-full rounded-xl border border-slate-200 bg-white p-2.5 text-sm font-medium text-slate-800"><option value="pending_review">Pending Review</option><option value="verified">Verified</option><option value="rejected">Rejected</option><option value="expired">Expired</option></select></label>
-          <label className="mt-4 block text-xs font-bold uppercase tracking-wider text-slate-600">Review notes<textarea value={reviewNotes} onChange={(event) => setReviewNotes(event.target.value)} rows={3} className="mt-2 w-full rounded-xl border border-slate-200 bg-white p-2.5 text-sm font-normal text-slate-800" placeholder="Add a decision note or requested correction..." /></label>
-          <button disabled={isSaving} onClick={() => onReview(verification.verification_id, status, reviewNotes)} className="mt-4 inline-flex items-center gap-2 rounded-full bg-indigo-600 px-4 py-2.5 text-xs font-bold text-white hover:bg-indigo-700 disabled:opacity-50"><Save className="h-3.5 w-3.5" />{isSaving ? "Saving..." : "Save Review"}</button>
+        <div>
+          <label className="block text-xs font-semibold text-slate-700">Review notes<textarea value={reviewNotes} onChange={(event) => setReviewNotes(event.target.value)} rows={3} className="mt-2 w-full rounded-xl border border-slate-200 bg-white p-2.5 text-sm font-normal text-slate-800" placeholder="Add a decision note or requested correction..." /></label>
+          <button disabled={isSaving} onClick={() => onReview(verification.verification_id, status, reviewNotes)} className="mt-3 inline-flex items-center gap-2 rounded-full bg-indigo-600 px-4 py-2.5 text-xs font-bold text-white hover:bg-indigo-700 disabled:opacity-50"><Save className="h-3.5 w-3.5" />{isSaving ? "Saving..." : "Save Review"}</button>
         </div>
       </div>
     </article>
   );
 }
 
-function Info({ label, value }) {
-  return <div><p className="font-bold uppercase tracking-wider text-slate-400">{label}</p><p className="mt-1 font-semibold text-slate-800">{value || "-"}</p></div>;
+function DetailSection({ title, children }) {
+  return <section className="py-5 first:pt-6"><h4 className="mb-4 text-xs font-bold uppercase tracking-wider text-slate-500">{title}</h4>{children}</section>;
+}
+
+function Info({ label, value, className = "" }) {
+  const displayValue = value === null || value === undefined || value === "" ? "Not provided" : String(value);
+  return <div className={className}><p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">{label}</p><p className="mt-1 break-words whitespace-pre-wrap text-sm font-medium leading-5 text-slate-800">{displayValue}</p></div>;
 }
 
 function ReviewSummary({ label, value, tone }) {
