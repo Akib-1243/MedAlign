@@ -305,6 +305,11 @@ Route::prefix('patient')->group(function () {
         '/issue-token',
         [PatientController::class, 'issueToken']
     );
+
+    Route::post(
+        '/cancel-token',
+        [PatientController::class, 'cancelToken']
+    );
 });
 
 Route::middleware(['jwt.auth', 'role:patient'])->prefix('patient/profile')->group(function () {

@@ -86,6 +86,7 @@ class PatientController extends Controller
 
         $latestToken = QueueToken::with(['doctor.user', 'doctor.clinic', 'counter'])
             ->where('patient_id', $patient->patient_id)
+            ->whereIn('status', ['waiting', 'called'])
             ->latest('token_id')
             ->first();
 
@@ -339,6 +340,73 @@ class PatientController extends Controller
                 'currently_serving' => 101,
                 'est_wait_time' => $patientsAhead * 15,
             ],
+        ]);
+    }
+
+    /**
+     * Cancel an active queue token / appointment.
+     */
+    public function cancelToken(Request $request)
+    {
+        $tokenId = $request->input('token_id');
+        $patientId = $request->input('patient_id');
+
+        if (!$tokenId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Token ID is required.',
+            ], 422);
+        }
+
+        $token = QueueToken::with(['doctor.user', 'patient'])->find($tokenId);
+
+        if (!$token) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Appointment token not found.',
+            ], 404);
+        }
+
+        // If patient_id is provided, verify it belongs to this patient
+        if ($patientId && (int) $token->patient_id !== (int) $patientId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized: This token does not belong to your account.',
+            ], 403);
+        }
+
+        if ($token->status === 'completed') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Cannot cancel an appointment that has already been completed.',
+            ], 400);
+        }
+
+        if ($token->status === 'cancelled') {
+            return response()->json([
+                'success' => true,
+                'message' => 'This appointment is already cancelled.',
+            ]);
+        }
+
+        // Update token status to cancelled
+        $token->update(['status' => 'cancelled']);
+
+        // Send Telegram notification if patient is linked
+        if ($token->patient && $token->patient->telegram_chat_id) {
+            $doctorName = $token->doctor?->user?->name ?? 'your doctor';
+            $msg = "❌ <b>Appointment Cancelled</b>\n\nYour consultation token <b>#{$token->token_number}</b> with <b>{$doctorName}</b> has been cancelled.";
+            app(TelegramService::class)->sendMessage($token->patient->telegram_chat_id, $msg);
+        }
+
+        // Notify subsequent patients in queue whose turn moved up
+        if ($token->doctor_id) {
+            app(QueueNotificationService::class)->notifyNearTurn($token->doctor_id);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Appointment cancelled successfully.',
         ]);
     }
 }

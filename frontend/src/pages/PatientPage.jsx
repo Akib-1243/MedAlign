@@ -23,7 +23,10 @@ import {
   HelpCircle,
   Send,
   UserCheck,
-  MapPin
+  MapPin,
+  XCircle,
+  AlertTriangle,
+  CheckCircle2
 } from "lucide-react";
 import Navbar from "../components/Navbar";
 import api from "../api";
@@ -58,6 +61,9 @@ export default function PatientPage({ authenticated, user, onLogout, onLoginClic
   const [selectedDoctor, setSelectedDoctor] = useState(null);
   const [isLoadingDoctorDetails, setIsLoadingDoctorDetails] = useState(false);
   const [doctorDetailsError, setDoctorDetailsError] = useState("");
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
+  const [cancelMessage, setCancelMessage] = useState("");
 
   // Alert Settings
   const [telegramAlert, setTelegramAlert] = useState(true);
@@ -205,6 +211,29 @@ export default function PatientPage({ authenticated, user, onLogout, onLoginClic
     }
   };
 
+  const handleCancelAppointment = async () => {
+    if (!currentToken?.token_id) return;
+    setIsCancelling(true);
+    try {
+      const res = await api.post("/patient/cancel-token", {
+        token_id: currentToken.token_id,
+        patient_id: patient?.patient_id,
+      });
+      if (res.data && res.data.success) {
+        setCurrentToken(null);
+        setShowCancelModal(false);
+        setCancelMessage("Appointment cancelled successfully. You can select another specialist below.");
+        fetchWorkspace();
+      } else {
+        alert(res.data?.message || "Could not cancel appointment.");
+      }
+    } catch (err) {
+      alert(err?.response?.data?.message || "Failed to cancel appointment. Please try again.");
+    } finally {
+      setIsCancelling(false);
+    }
+  };
+
   const handleTelegramAlertChange = async (enabled) => {
     if (!patient.patient_id) {
       setAlertsError("Sign in with your patient account to change notification preferences.");
@@ -348,6 +377,20 @@ export default function PatientPage({ authenticated, user, onLogout, onLoginClic
         {/* ══ TAB 1: LIVE QUEUE TRACKER ══ */}
         {activeTab === "tracker" && (
           <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }} className="space-y-6">
+            {cancelMessage && (
+              <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 flex items-center justify-between gap-3 shadow-sm">
+                <div className="flex items-center gap-3">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+                  <p className="text-xs font-semibold">{cancelMessage}</p>
+                </div>
+                <button
+                  onClick={() => setCancelMessage("")}
+                  className="p-1 rounded-lg text-emerald-600 hover:bg-emerald-100 cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            )}
             {!currentToken ? (
               <div className="p-8 sm:p-10 rounded-3xl bg-white border border-slate-200/90 shadow-xl text-center space-y-6">
                 <div className="mx-auto w-16 h-16 rounded-2xl bg-sky-50 text-sky-700 flex items-center justify-center border border-sky-100">
@@ -460,11 +503,24 @@ export default function PatientPage({ authenticated, user, onLogout, onLoginClic
                         <h2 className="text-2xl font-extrabold text-slate-950 mt-1">{currentToken.clinic_name}</h2>
                         <p className="text-xs text-slate-500">{currentToken.clinic_address}</p>
                       </div>
-                      <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
-                        currentToken.status === "called" ? "bg-emerald-100 text-emerald-800 animate-pulse" : "bg-blue-100 text-blue-800"
-                      }`}>
-                        {currentToken.status === "called" ? "● Called into Chamber" : "Waiting in Lobby"}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
+                          currentToken.status === "called" ? "bg-emerald-100 text-emerald-800 animate-pulse" : "bg-blue-100 text-blue-800"
+                        }`}>
+                          {currentToken.status === "called" ? "● Called into Chamber" : "Waiting in Lobby"}
+                        </span>
+                        {currentToken.status === "waiting" && (
+                          <button
+                            type="button"
+                            onClick={() => setShowCancelModal(true)}
+                            className="px-3 py-1 rounded-full text-xs font-bold text-red-600 hover:text-white bg-red-50 hover:bg-red-600 border border-red-200 transition cursor-pointer flex items-center gap-1 shadow-2xs"
+                            title="Cancel this appointment"
+                          >
+                            <XCircle className="w-3.5 h-3.5" />
+                            <span>Cancel</span>
+                          </button>
+                        )}
+                      </div>
                     </div>
 
                     <div className="my-8 text-center sm:text-left flex flex-col sm:flex-row items-center justify-between gap-6 p-6 rounded-2xl bg-slate-50 border border-slate-200">
@@ -525,10 +581,19 @@ export default function PatientPage({ authenticated, user, onLogout, onLoginClic
                       </div>
                     </div>
 
-                    <div className="space-y-2 text-center">
+                    <div className="space-y-3 text-center">
                       <p className="text-[11px] text-slate-400">
                         Please take a seat in the waiting lobby. Your token number will be announced when called into the chamber.
                       </p>
+                      {currentToken.status === "waiting" && (
+                        <button
+                          type="button"
+                          onClick={() => setShowCancelModal(true)}
+                          className="w-full py-2.5 px-4 rounded-xl border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 text-red-300 hover:text-red-200 text-xs font-semibold transition flex items-center justify-center gap-2 cursor-pointer"
+                        >
+                          <XCircle className="w-4 h-4" /> Cancel Appointment
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1079,6 +1144,50 @@ export default function PatientPage({ authenticated, user, onLogout, onLoginClic
           </section>
         </div>
       )}
+
+      {/* Cancel Confirmation Modal */}
+      <AnimatePresence>
+        {showCancelModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white rounded-3xl p-6 sm:p-7 max-w-md w-full shadow-2xl border border-slate-100 space-y-4"
+            >
+              <div className="w-12 h-12 rounded-2xl bg-red-50 border border-red-100 text-red-600 flex items-center justify-center mx-auto">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <div className="text-center space-y-1.5">
+                <h3 className="text-lg font-bold text-slate-900">Cancel This Appointment?</h3>
+                <p className="text-xs text-slate-500 leading-relaxed">
+                  Are you sure you want to cancel Token <strong className="text-slate-900">#{currentToken?.token_number}</strong> with <strong className="text-slate-900">{currentToken?.doctor_name}</strong>?
+                  Your place in the live queue will be released immediately.
+                </p>
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowCancelModal(false)}
+                  disabled={isCancelling}
+                  className="flex-1 py-2.5 px-4 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-semibold cursor-pointer transition disabled:opacity-50"
+                >
+                  Keep Appointment
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCancelAppointment}
+                  disabled={isCancelling}
+                  className="flex-1 py-2.5 px-4 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold shadow-md shadow-red-500/20 cursor-pointer transition disabled:opacity-50 flex items-center justify-center gap-1.5"
+                >
+                  {isCancelling ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <XCircle className="w-3.5 h-3.5" />}
+                  <span>{isCancelling ? "Cancelling..." : "Yes, Cancel"}</span>
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
