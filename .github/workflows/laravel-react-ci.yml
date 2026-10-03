@@ -14,10 +14,11 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # ----------------------------------------------------
-  # JOB 1: Laravel Backend & MySQL Tests (runs inside ./backend)
-  # ----------------------------------------------------
+  # ─────────────────────────────────────────────────────────────────────────────
+  # JOB 1: Laravel Backend Tests
+  # ─────────────────────────────────────────────────────────────────────────────
   laravel-backend:
+    name: Laravel Backend Tests
     runs-on: ubuntu-24.04
     defaults:
       run:
@@ -80,10 +81,11 @@ jobs:
           DB_PASSWORD: ""
         run: vendor/bin/phpunit
 
-  # ----------------------------------------------------
-  # JOB 2: React Frontend Build (runs inside ./frontend)
-  # ----------------------------------------------------
+  # ─────────────────────────────────────────────────────────────────────────────
+  # JOB 2: React Frontend Build
+  # ─────────────────────────────────────────────────────────────────────────────
   react-frontend:
+    name: React Frontend Build
     runs-on: ubuntu-24.04
     defaults:
       run:
@@ -104,13 +106,15 @@ jobs:
         run: npm ci
 
       - name: Build React Production Assets
+        env:
+          VITE_API_BASE_URL: https://medalign.austattendance.online/api
         run: npm run build
 
-  # ----------------------------------------------------
-  # JOB 3: Deploy to VPS (only on push to main/master)
-  # ----------------------------------------------------
+  # ─────────────────────────────────────────────────────────────────────────────
+  # JOB 3: Deploy to VPS  (push to main/master only)
+  # ─────────────────────────────────────────────────────────────────────────────
   deploy:
-    name: Deploy to VPS
+    name: "Deploy → medalign.austattendance.online"
     runs-on: ubuntu-24.04
     needs: [ laravel-backend, react-frontend ]
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
@@ -126,7 +130,7 @@ jobs:
           script: |
             set -e
 
-            echo "==> Pulling latest code via Docker git..."
+            echo "==> Pulling latest code..."
             sudo docker run --rm \
               -v ${{ secrets.VPS_PROJECT_PATH }}:${{ secrets.VPS_PROJECT_PATH }} \
               alpine/git \
@@ -134,23 +138,32 @@ jobs:
               -C ${{ secrets.VPS_PROJECT_PATH }} \
               pull origin main
 
-            echo "==> Navigating to project directory"
             cd ${{ secrets.VPS_PROJECT_PATH }}
 
-            echo "==> Rebuilding and restarting Docker containers"
-            sudo docker compose up --build -d --remove-orphans
+            echo "==> Rebuilding containers with domain API URL..."
+            sudo VITE_API_BASE_URL=https://medalign.austattendance.online/api \
+              docker compose build \
+                --build-arg VITE_API_BASE_URL=https://medalign.austattendance.online/api \
+                frontend
+
+            echo "==> Starting all containers..."
+            sudo docker compose up -d --remove-orphans
 
             echo "==> Waiting for DB to be healthy..."
             sleep 30
 
-            echo "==> Running Laravel migrations"
+            echo "==> Running migrations..."
             sudo docker compose exec -T app php artisan migrate --force
 
-            echo "==> Clearing and warming up Laravel caches"
+            echo "==> Caching Laravel config & routes..."
             sudo docker compose exec -T app php artisan config:clear
             sudo docker compose exec -T app php artisan route:clear
             sudo docker compose exec -T app php artisan view:clear
             sudo docker compose exec -T app php artisan config:cache
             sudo docker compose exec -T app php artisan route:cache
 
-            echo "==> Deployment complete!"
+            echo "==> Reloading host Nginx..."
+            sudo systemctl reload nginx || true
+
+            echo ""
+            echo "==> Live at: https://medalign.austattendance.online"

@@ -12,8 +12,9 @@ services:
       - ./backend:/var/www
       - /var/www/vendor # keep vendor inside container
     environment:
-      APP_ENV: local
-      APP_DEBUG: "true"
+      APP_ENV: production
+      APP_DEBUG: "false"
+      APP_URL: https://medalign.austattendance.online
       DB_CONNECTION: mysql
       DB_HOST: db # Docker service name — internal network
       DB_PORT: 3306
@@ -77,7 +78,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        VITE_API_BASE_URL: http://187.52.122.100:9000/api
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-https://medalign.austattendance.online/api}
     image: medalign-frontend
     container_name: medalign_frontend
     restart: unless-stopped
