@@ -35,6 +35,30 @@ services:
       - medalign-network
 
   # ─── Nginx Web Server ────────────────────────────────────────────────────────
+  telegram-poller:
+    image: medalign-backend
+    container_name: medalign_telegram_poller
+    restart: unless-stopped
+    working_dir: /var/www
+    command: php artisan telegram:poll
+    volumes:
+      - ./backend:/var/www
+      - /var/www/vendor
+    environment:
+      DB_CONNECTION: mysql
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_DATABASE: medalign_db
+      DB_USERNAME: medalign_user
+      DB_PASSWORD: medalign_password
+    depends_on:
+      db:
+        condition: service_healthy
+    profiles:
+      - telegram
+    networks:
+      - medalign-network
+
   web:
     image: nginx:alpine
     container_name: medalign_web
@@ -49,13 +73,33 @@ services:
     networks:
       - medalign-network
 
+  # ─── React Frontend (Vite development server) ────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: medalign-frontend
+    container_name: medalign_frontend
+    restart: unless-stopped
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      VITE_API_BASE_URL: http://localhost:8000/api
+    depends_on:
+      - web
+    networks:
+      - medalign-network
+
   # ─── MySQL Database ──────────────────────────────────────────────────────────
   db:
     image: mysql:8.0
     container_name: medalign_db
     restart: unless-stopped
-    ports:
-      - "3307:3306" # 3307 externally to avoid conflict with local MySQL
+    # ports:
+    #   - "3307:3306" # disabled on VPS — MySQL accessible only within Docker network
     environment:
       MYSQL_DATABASE: medalign_db
       MYSQL_ROOT_PASSWORD: medalign_secret

@@ -105,3 +105,47 @@ jobs:
 
       - name: Build React Production Assets
         run: npm run build
+
+  # ----------------------------------------------------
+  # JOB 3: Deploy to VPS (only on push to main/master)
+  # ----------------------------------------------------
+  deploy:
+    name: Deploy to VPS
+    runs-on: ubuntu-24.04
+    needs: [ laravel-backend, react-frontend ]
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_SSH_PORT }}
+          script: |
+            set -e
+
+            echo "==> Navigating to project directory"
+            cd ${{ secrets.VPS_PROJECT_PATH }}
+
+            echo "==> Pulling latest code from GitHub"
+            git pull origin ${{ github.ref_name }}
+
+            echo "==> Rebuilding and restarting Docker containers"
+            docker compose up --build -d --remove-orphans
+
+            echo "==> Waiting for DB to be healthy..."
+            sleep 15
+
+            echo "==> Running Laravel migrations"
+            docker compose exec -T app php artisan migrate --force
+
+            echo "==> Clearing and warming up Laravel caches"
+            docker compose exec -T app php artisan config:clear
+            docker compose exec -T app php artisan route:clear
+            docker compose exec -T app php artisan view:clear
+            docker compose exec -T app php artisan config:cache
+            docker compose exec -T app php artisan route:cache
+
+            echo "==> Deployment complete!"
