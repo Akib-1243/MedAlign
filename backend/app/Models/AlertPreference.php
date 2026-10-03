@@ -13,6 +13,7 @@ class AlertPreference extends Model
         'patient_id',
         'sms_enabled',
         'whatsapp_enabled',
+        'telegram_enabled',
         'near_turn_threshold',
     ];
 

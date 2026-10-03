@@ -9,6 +9,10 @@ class Patient extends Model
     protected $primaryKey = 'patient_id';
     public $timestamps = false;
 
+    protected $hidden = [
+        'telegram_chat_id',
+    ];
+
     protected $fillable = [
         'name',
         'phone',

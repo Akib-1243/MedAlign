@@ -8,6 +8,7 @@ use App\Http\Controllers\PatientController;
 use App\Http\Controllers\ReceptionDashboardController;
 use App\Http\Controllers\UsersController;
 use App\Http\Controllers\ClinicVerificationController;
+use App\Http\Controllers\TelegramWebhookController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -299,6 +300,17 @@ Route::prefix('patient')->group(function () {
         [PatientController::class, 'issueToken']
     );
 });
+
+/*
+|--------------------------------------------------------------------------
+| Telegram Bot Webhook
+|--------------------------------------------------------------------------
+| Receives bot updates so patients can link their phone number for
+| queue alerts. Protected by TELEGRAM_WEBHOOK_SECRET.
+*/
+
+Route::post('/telegram/webhook', [TelegramWebhookController::class, 'handle'])
+    ->middleware('throttle:120,1');
 
 /*
 |--------------------------------------------------------------------------
