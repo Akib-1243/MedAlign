@@ -100,7 +100,7 @@ User::firstOrCreate(['email' => 'reception@medalign.test'], [
             'name'              => 'Amina Yusuf',
             'first_name'        => 'Amina',
             'last_name'         => 'Yusuf',
-            'phone'             => '+1 555 0101',
+            'phone'             => '01521202272',
             'password'          => Hash::make('password'),
             'role'              => 'patient',
             'email_verified_at' => now(),
@@ -110,7 +110,7 @@ User::firstOrCreate(['email' => 'reception@medalign.test'], [
             'name'              => 'Amina Yusuf',
             'first_name'        => 'Amina',
             'last_name'         => 'Yusuf',
-            'phone'             => '+1 555 0101',
+            'phone'             => '01521202272',
             'password'          => Hash::make('password'),
             'role'              => 'patient',
             'email_verified_at' => now(),
@@ -179,7 +179,7 @@ User::firstOrCreate(['email' => 'reception@medalign.test'], [
         // ── 6. Patients ───────────────────────────────────────────────────
 
         $patientsData = [
-            ['Amina Yusuf',      '+1 555 0101', '1988-04-12', 'amina@test.org',   'Female'],
+            ['Amina Yusuf',      '01521202272', '1988-04-12', 'patient@medalign.test',   'Female'],
             ['Michael Chen',     '+1 555 0102', '1979-11-03', 'michael@test.org', 'Male'],
             ['Priya Nair',       '+1 555 0103', '1994-07-28', 'priya@test.org',   'Female'],
             ['Jon Bell',         '+1 555 0104', '1967-02-16', 'jon@test.org',     'Male'],
