@@ -212,6 +212,7 @@ export default function PatientPage({ authenticated, user, onLogout, onLoginClic
   const handleAnalyzeSymptoms = async (queryText) => {
     const textToAnalyze = (queryText !== undefined ? queryText : aiQuery).trim();
     if (!textToAnalyze) return;
+    setAiResult(null);
     setIsAnalyzingAi(true);
     setAiError("");
     try {
@@ -523,7 +524,7 @@ export default function PatientPage({ authenticated, user, onLogout, onLoginClic
                   </div>
                 </div>
                 <span className="px-3 py-1 rounded-full bg-purple-100 text-purple-800 text-xs font-bold border border-purple-200 hidden sm:inline-flex">
-                  Clinical NLP Powered
+                  Guided symptom triage
                 </span>
               </div>
 
@@ -596,32 +597,58 @@ export default function PatientPage({ authenticated, user, onLogout, onLoginClic
                       <div className="flex items-center gap-2 text-purple-900 font-bold text-xs uppercase tracking-wider">
                         <BrainCircuit className="w-4 h-4 text-purple-600" /> Recommended Medical Domain
                       </div>
-                      <p className="text-xl font-extrabold text-slate-900">{aiResult.recommended_specialty}</p>
-                      <p className="text-xs text-slate-600 leading-relaxed">{aiResult.clinical_rationale}</p>
+                      <p className="text-xl font-extrabold text-slate-900">
+                        {aiResult.recommended_specialty || (aiResult.urgency_flag ? "Emergency care now" : "More detail needed")}
+                      </p>
+                      <p className="text-xs text-slate-600 leading-relaxed">
+                        {aiResult.clinical_rationale || aiResult.urgency_message || aiResult.clarification_message}
+                      </p>
                     </div>
 
                     <div className="p-5 rounded-2xl bg-white border border-indigo-100 shadow-sm space-y-2">
                       <div className="flex items-center gap-2 text-indigo-900 font-bold text-xs uppercase tracking-wider">
                         <Lightbulb className="w-4 h-4 text-indigo-600" /> Visit Preparation Advice
                       </div>
-                      <p className="text-xs text-slate-700 leading-relaxed font-medium mt-1">{aiResult.preparation_advice}</p>
+                      <p className="text-xs text-slate-700 leading-relaxed font-medium mt-1">
+                        {aiResult.preparation_advice || (aiResult.urgency_flag
+                          ? "Do not wait for a routine appointment or online response."
+                          : "Add the symptom, affected area, and when it began to get a useful suggestion.")}
+                      </p>
                     </div>
                   </div>
 
-                  {/* Matched Doctors List */}
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h4 className="text-sm font-bold text-slate-900 uppercase tracking-wider">Recommended Clinicians for You</h4>
-                        <p className="text-xs text-slate-500">Ranked by specialty alignment &amp; live chamber availability</p>
-                      </div>
-                      <span className="text-xs font-bold text-purple-700 bg-purple-50 border border-purple-200 px-3 py-1 rounded-full">
-                        {aiResult.matched_doctors?.length || 0} Doctors Available
-                      </span>
+                  {aiResult.recognized_symptoms?.length > 0 && (
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600">
+                      <span className="font-semibold text-slate-700">Recognized details:</span>
+                      {aiResult.recognized_symptoms.map((signal) => (
+                        <span key={signal} className="rounded-full border border-slate-200 bg-white px-2.5 py-1">{signal}</span>
+                      ))}
                     </div>
+                  )}
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {aiResult.matched_doctors?.map((doc) => (
+                  {aiResult.alternative_specialties?.length > 0 && (
+                    <p className="text-xs text-slate-600">
+                      Other specialties that may be relevant: {aiResult.alternative_specialties.join(", ")}.
+                    </p>
+                  )}
+
+                  {aiResult.disclaimer && <p className="text-xs text-slate-500">{aiResult.disclaimer}</p>}
+
+                  {!aiResult.urgency_flag && !aiResult.needs_clarification && (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h4 className="text-sm font-bold text-slate-900 uppercase tracking-wider">Matching Clinicians</h4>
+                          <p className="text-xs text-slate-500">Specialty matches, sorted by availability and current queue</p>
+                        </div>
+                        <span className="text-xs font-bold text-purple-700 bg-purple-50 border border-purple-200 px-3 py-1 rounded-full">
+                          {aiResult.matched_doctors?.length || 0} Matching
+                        </span>
+                      </div>
+
+                      {aiResult.matched_doctors?.length ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {aiResult.matched_doctors.map((doc) => (
                         <div
                           key={doc.doctor_id}
                           className="p-6 rounded-2xl border border-slate-200 bg-white hover:border-purple-400 transition flex flex-col justify-between space-y-4 shadow-sm hover:shadow-md"
@@ -630,7 +657,7 @@ export default function PatientPage({ authenticated, user, onLogout, onLoginClic
                             <div className="flex items-start justify-between gap-2">
                               <div>
                                 <span className="text-[11px] font-bold text-purple-700 bg-purple-50 px-2.5 py-0.5 rounded-full border border-purple-200">
-                                  {doc.match_confidence}
+                                  {doc.match_label}
                                 </span>
                                 <h5 className="text-lg font-bold text-slate-950 mt-2">{doc.name}</h5>
                                 <p className="text-xs font-bold text-sky-700">{doc.specialization}</p>
@@ -644,7 +671,6 @@ export default function PatientPage({ authenticated, user, onLogout, onLoginClic
 
                             <div className="text-xs text-slate-500 space-y-1 pt-2 border-t border-slate-100">
                               <p className="flex items-center gap-1.5"><Building2 className="w-3.5 h-3.5 text-slate-400" /> {doc.clinic_name}</p>
-                              <p className="flex items-center gap-1.5"><Stethoscope className="w-3.5 h-3.5 text-slate-400" /> {doc.experience}</p>
                               <p className="text-slate-600 font-medium">Live Queue: <strong>{doc.waiting_patients} waiting</strong> (~{doc.est_wait_minutes} min est.)</p>
                             </div>
                           </div>
@@ -665,9 +691,15 @@ export default function PatientPage({ authenticated, user, onLogout, onLoginClic
                             )}
                           </button>
                         </div>
-                      ))}
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="rounded-2xl border border-slate-200 bg-white p-5 text-sm text-slate-600">
+                          {aiResult.availability_message || "No matching clinician is listed right now. Please contact the clinic for guidance."}
+                        </div>
+                      )}
                     </div>
-                  </div>
+                  )}
                 </motion.div>
               )}
             </div>
