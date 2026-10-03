@@ -141,10 +141,9 @@ jobs:
             cd ${{ secrets.VPS_PROJECT_PATH }}
 
             echo "==> Rebuilding containers with domain API URL..."
-            sudo VITE_API_BASE_URL=https://medalign.austattendance.online/api \
-              docker compose build \
-                --build-arg VITE_API_BASE_URL=https://medalign.austattendance.online/api \
-                frontend
+            sudo docker compose build \
+              --build-arg VITE_API_BASE_URL=https://medalign.austattendance.online/api \
+              frontend
 
             echo "==> Starting all containers..."
             sudo docker compose up -d --remove-orphans
@@ -174,12 +173,15 @@ jobs:
             else
               echo "SSL cert already exists, skipping."
             fi
+            chmod 755 ~/ssl_certs
+            chmod 644 ~/ssl_certs/fullchain.pem ~/ssl_certs/privkey.pem 2>/dev/null || true
 
             echo "==> Deploying host Nginx config..."
+            sudo rm -f /etc/nginx/sites-enabled/default
             sudo cp ${{ secrets.VPS_PROJECT_PATH }}/nginx-proxy/medalign.conf /etc/nginx/sites-available/medalign.conf
             sudo ln -sf /etc/nginx/sites-available/medalign.conf /etc/nginx/sites-enabled/medalign.conf
-            sudo /usr/sbin/nginx -t
-            sudo systemctl reload nginx
+            sudo nginx -t 2>/dev/null || sudo /usr/sbin/nginx -t
+            sudo systemctl reload nginx || sudo systemctl restart nginx
 
             echo ""
             echo "==> Live at: https://medalign.austattendance.online"
