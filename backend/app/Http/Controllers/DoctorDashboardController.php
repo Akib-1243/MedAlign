@@ -30,7 +30,14 @@ class DoctorDashboardController extends Controller
         $current = (clone $base)->where('status', 'called')
             ->orderBy('called_time', 'desc')->first();
         $queue = (clone $base)->where('status', 'waiting')->orderBy('token_number')->limit(20)->get();
-        $today = (clone $base)->whereDate('check_in_time', now()->toDateString());
+        $today = now()->toDateString();
+        $completedToday = (clone $base)->where('status', 'completed')
+            ->whereDate('completed_time', $today);
+        $averageConsultation = (clone $completedToday)
+            ->whereNotNull('called_time')
+            ->whereDate('called_time', $today)
+            ->whereColumn('completed_time', '>', 'called_time')
+            ->avg(DB::raw('TIMESTAMPDIFF(SECOND, called_time, completed_time) / 60'));
 
         return response()->json([
             'doctor' => [
@@ -44,9 +51,13 @@ class DoctorDashboardController extends Controller
             'queue' => $queue->map(fn (QueueToken $token) => $this->token($token))->values(),
             'stats' => [
                 'waiting' => (clone $base)->where('status', 'waiting')->count(),
-                'completed_today' => (clone $today)->where('status', 'completed')->count(),
-                'consulted_today' => (clone $today)->whereIn('status', ['called', 'completed'])->count(),
-                'average_wait' => (int) ((clone $today)->whereNotNull('called_time')->avg(DB::raw('TIMESTAMPDIFF(MINUTE, check_in_time, called_time)')) ?? 0),
+                'completed_today' => (clone $completedToday)->count(),
+                'consulted_today' => (clone $base)->whereNotNull('called_time')->whereDate('called_time', $today)->count(),
+                'avg_consult_min' => $averageConsultation !== null
+                    ? max(1, (int) round($averageConsultation))
+                    : ($doctor->avg_consult_min ?? 15),
+                'avg_consult_is_actual' => $averageConsultation !== null,
+                'average_wait' => (int) ((clone $base)->whereNotNull('called_time')->whereDate('called_time', $today)->avg(DB::raw('TIMESTAMPDIFF(MINUTE, check_in_time, called_time)')) ?? 0),
             ],
             'recent_prescriptions' => $doctor->prescriptions()->with('patient')->latest('issued_at')->limit(4)->get()->map(fn ($prescription) => [
                 'id' => $prescription->prescription_id,
@@ -99,6 +110,14 @@ class DoctorDashboardController extends Controller
 
         $status = $request->validate(['status' => ['required', 'in:skipped,completed,waiting,called']])['status'];
 
+        if ((int) $token->doctor_id !== (int) $doctor->doctor_id) {
+            return response()->json(['message' => 'Queue token not found for this doctor.'], 404);
+        }
+
+        if (in_array($status, ['completed', 'skipped'], true) && $token->status !== 'called') {
+            return response()->json(['message' => 'Only the active consultation can be completed or skipped.'], 409);
+        }
+
         $updateData = ['status' => $status];
         if ($status === 'completed' || $status === 'skipped') {
             $updateData['completed_time'] = now();
@@ -140,12 +159,7 @@ class DoctorDashboardController extends Controller
             }
         }
 
-        if ($request->has('doctor_id')) {
-            $doc = Doctor::with('user')->find($request->input('doctor_id'));
-            if ($doc) return $doc;
-        }
-
-        return Doctor::with('user')->orderBy('doctor_id')->first();
+        return null;
     }
 
     private function activeToken(Doctor $doctor): ?QueueToken
@@ -190,13 +204,22 @@ class DoctorDashboardController extends Controller
         $notes = $request->input('notes', 'Routine consultation and treatment.');
         $medicines = $request->input('items', []);
 
-        if (!$patientId && $queueTokenId) {
-            $token = QueueToken::find($queueTokenId);
-            $patientId = $token ? $token->patient_id : 1;
+        $token = null;
+        if ($queueTokenId) {
+            $token = QueueToken::where('token_id', $queueTokenId)
+                ->where('doctor_id', $doctor->doctor_id)
+                ->where('status', 'called')
+                ->first();
+
+            if (!$token) {
+                return response()->json(['message' => 'Active queue token not found for this doctor.'], 404);
+            }
+
+            $patientId = $token->patient_id;
         }
 
         if (!$patientId) {
-            $patientId = 1;
+            return response()->json(['message' => 'A patient is required to issue a prescription.'], 422);
         }
 
         $rxId = DB::table('prescriptions')->insertGetId([
@@ -232,8 +255,8 @@ class DoctorDashboardController extends Controller
             ]);
         }
 
-        if ($queueTokenId) {
-            QueueToken::where('token_id', $queueTokenId)->update([
+        if ($token) {
+            $token->update([
                 'status' => 'completed',
                 'completed_time' => now(),
             ]);

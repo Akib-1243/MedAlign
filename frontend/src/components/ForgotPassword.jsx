@@ -121,7 +121,8 @@ export default function ForgotPassword({ onBack, onSuccessLogin }) {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="doctor@medalign.test or patient@example.com"
-                    className="med-input pl-10"
+                    className="med-input"
+                    style={{ paddingLeft: '2.75rem' }}
                   />
                 </div>
               </div>

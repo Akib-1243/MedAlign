@@ -5,6 +5,7 @@ use App\Http\Controllers\AiController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DoctorDashboardController;
 use App\Http\Controllers\PatientController;
+use App\Http\Controllers\PatientProfileController;
 use App\Http\Controllers\ReceptionDashboardController;
 use App\Http\Controllers\UsersController;
 use App\Http\Controllers\ClinicVerificationController;
@@ -299,6 +300,14 @@ Route::prefix('patient')->group(function () {
         '/issue-token',
         [PatientController::class, 'issueToken']
     );
+});
+
+Route::middleware(['jwt.auth', 'role:patient'])->prefix('patient/profile')->group(function () {
+    Route::get('/', [PatientProfileController::class, 'show']);
+    Route::put('/', [PatientProfileController::class, 'update']);
+    Route::post('/photo', [PatientProfileController::class, 'uploadPhoto']);
+    Route::get('/photo', [PatientProfileController::class, 'showPhoto']);
+    Route::delete('/photo', [PatientProfileController::class, 'deletePhoto']);
 });
 
 /*

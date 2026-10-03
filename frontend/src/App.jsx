@@ -15,6 +15,7 @@ import DoctorsPage from "./pages/DoctorsPage";
 import ContactPage from "./pages/ContactPage";
 import GetStartedPage from "./pages/GetStartedPage";
 import PatientPage from "./pages/PatientPage";
+import PatientProfilePage from "./pages/PatientProfilePage";
 import ReceptionDashboard from "./pages/ReceptionDashboard";
 import ClinicVerificationPage from "./pages/ClinicVerificationPage";
 import TermsAndConditions from "./pages/TermsAndConditions";
@@ -650,6 +651,27 @@ function App() {
                   onLoginClick={() =>
                     navigate("/auth")
                   }
+                />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/patient/profile"
+            element={
+              <ProtectedRoute
+                authenticated={authenticated}
+                user={user}
+                allowedRoles={["patient"]}
+                loginPath="/auth"
+              >
+                <PatientProfilePage
+                  user={user}
+                  onLogout={handleLogout}
+                  onUserUpdated={(updatedUser) => {
+                    localStorage.setItem("user", JSON.stringify(updatedUser));
+                    setUser(updatedUser);
+                  }}
                 />
               </ProtectedRoute>
             }

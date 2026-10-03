@@ -38,6 +38,7 @@ const EMPTY_MED = { medicine_name: "", dosage: "", frequency: "", duration: "", 
 function DoctorDashboard({ user, onLogout, onBack }) {
   const [dashboard, setDashboard] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [error, setError] = useState("");
   const [isOffline, setIsOffline] = useState(false);
@@ -58,13 +59,14 @@ function DoctorDashboard({ user, onLogout, onBack }) {
   const [loadingAiSummary, setLoadingAiSummary] = useState(false);
   const [aiSummaryError, setAiSummaryError] = useState("");
 
-  const loadDashboard = async () => {
+  const loadDashboard = async ({ manual = false } = {}) => {
+    if (manual) setIsRefreshing(true);
     setError("");
     try {
       const res = await api.get("/doctor/queue-snapshot");
       setDashboard(res.data);
       setIsOffline(false);
-    } catch {
+    } catch (e) {
       setDashboard((cur) => cur || {
         doctor: { name: user?.name || "Dr. Consultation Desk", specialization: "General Medicine", avg_consult_min: 15 },
         current: null,
@@ -73,8 +75,10 @@ function DoctorDashboard({ user, onLogout, onBack }) {
         recent_prescriptions: [],
       });
       setIsOffline(true);
+      if (manual) setError(e?.response?.data?.message || "Queue refresh failed. Showing the last available data.");
     } finally {
       setIsLoading(false);
+      if (manual) setIsRefreshing(false);
     }
   };
 
@@ -191,11 +195,11 @@ function DoctorDashboard({ user, onLogout, onBack }) {
           </div>
           <div className="flex items-center gap-3">
             <button
-              onClick={loadDashboard}
-              disabled={isLoading}
+              onClick={() => loadDashboard({ manual: true })}
+              disabled={isLoading || isRefreshing}
               className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50 cursor-pointer disabled:opacity-50"
             >
-              <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? "animate-spin text-sky-600" : ""}`} /> Refresh Queue
+              <RefreshCw className={`h-3.5 w-3.5 ${isLoading || isRefreshing ? "animate-spin text-sky-600" : ""}`} /> Refresh Queue
             </button>
             {onLogout && (
               <button
@@ -213,8 +217,8 @@ function DoctorDashboard({ user, onLogout, onBack }) {
         {/* Alerts & Toasts */}
         {isOffline && (
           <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800 flex items-center justify-between">
-            <span>Backend offline — MySQL engine active in background.</span>
-            <button onClick={loadDashboard} className="font-bold underline cursor-pointer">
+            <span>Unable to reach the backend. Showing the last available queue data.</span>
+            <button onClick={() => loadDashboard({ manual: true })} className="font-bold underline cursor-pointer">
               Retry
             </button>
           </div>
@@ -238,7 +242,7 @@ function DoctorDashboard({ user, onLogout, onBack }) {
         <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Metric icon={<CalendarClock className="h-5 w-5" />} label="Waiting in Queue" value={dashboard?.stats?.waiting ?? 0} detail="Assigned specifically to you" tone="blue" />
           <Metric icon={<CheckCircle2 className="h-5 w-5" />} label="Completed Today" value={dashboard?.stats?.completed_today ?? 0} detail="Consultations finished" tone="green" />
-          <Metric icon={<Clock3 className="h-5 w-5" />} label="Avg Consultation" value={`${dashboard?.doctor?.avg_consult_min ?? 15}m`} detail="Allocated time slot" tone="indigo" />
+          <Metric icon={<Clock3 className="h-5 w-5" />} label="Avg Consultation" value={`${dashboard?.stats?.avg_consult_min ?? 0}m`} detail={dashboard?.stats?.avg_consult_is_actual ? "Actual average today" : "Configured consultation time"} tone="indigo" />
           <Metric icon={<Activity className="h-5 w-5" />} label="Total Consulted" value={dashboard?.stats?.consulted_today ?? 0} detail="Called or finished today" tone="amber" />
         </section>
 

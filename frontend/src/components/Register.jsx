@@ -4,9 +4,19 @@ import api from '../api';
 import { UserRound, Stethoscope, ShieldCheck, Building2 } from 'lucide-react';
 
 const Register = ({ onSuccess, onRequireOtp, initialRole = 'patient', lockRole = false }) => {
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
+  const [secondaryPhone, setSecondaryPhone] = useState('');
+  const [age, setAge] = useState('');
+  const [registeringForOther, setRegisteringForOther] = useState(false);
+  const [relationshipToPatient, setRelationshipToPatient] = useState('');
+  const [parentGuardianName, setParentGuardianName] = useState('');
+  const [parentGuardianPhone, setParentGuardianPhone] = useState('');
+  const [friendParentName, setFriendParentName] = useState('');
+  const [friendParentPhone, setFriendParentPhone] = useState('');
   const [password, setPassword] = useState('');
   const [passwordConfirmation, setPasswordConfirmation] = useState('');
   const [termsAccepted, setTermsAccepted] = useState(false);
@@ -37,11 +47,39 @@ const Register = ({ onSuccess, onRequireOtp, initialRole = 'patient', lockRole =
       return;
     }
 
+    if (role === 'patient' && registeringForOther && !relationshipToPatient) {
+      setError('Select your relationship to the patient.');
+      setIsLoading(false);
+      return;
+    }
+
+    if (role === 'patient' && Number(age) < 18 && (!parentGuardianName.trim() || !parentGuardianPhone.trim())) {
+      setError('A parent or guardian name and phone number are required for patients under 18.');
+      setIsLoading(false);
+      return;
+    }
+
+    if (role === 'patient' && registeringForOther && relationshipToPatient === 'friend' && (!friendParentName.trim() || !friendParentPhone.trim())) {
+      setError("A friend's parent name and phone number are required when registering for a friend.");
+      setIsLoading(false);
+      return;
+    }
+
     try {
       const response = await api.post('/auth/register', {
-        name,
+        name: role === 'patient' ? `${firstName.trim()} ${lastName.trim()}` : name,
+        first_name: role === 'patient' ? firstName.trim() : undefined,
+        last_name: role === 'patient' ? lastName.trim() : undefined,
         email,
         phone,
+        secondary_phone: role === 'patient' ? secondaryPhone : undefined,
+        age: role === 'patient' ? Number(age) : undefined,
+        registering_for_other: role === 'patient' ? registeringForOther : undefined,
+        relationship_to_patient: role === 'patient' && registeringForOther ? relationshipToPatient : undefined,
+        parent_guardian_name: role === 'patient' && Number(age) < 18 ? parentGuardianName.trim() : undefined,
+        parent_guardian_phone: role === 'patient' && Number(age) < 18 ? parentGuardianPhone.trim() : undefined,
+        friend_parent_name: role === 'patient' && registeringForOther && relationshipToPatient === 'friend' ? friendParentName.trim() : undefined,
+        friend_parent_phone: role === 'patient' && registeringForOther && relationshipToPatient === 'friend' ? friendParentPhone.trim() : undefined,
         password,
         password_confirmation: passwordConfirmation,
         terms_accepted: termsAccepted,
@@ -96,17 +134,25 @@ const Register = ({ onSuccess, onRequireOtp, initialRole = 'patient', lockRole =
       {error && <div className="mb-4 rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{error}</div>}
       
       <form onSubmit={handleSubmit} className="space-y-4">
-        <label className="block">
-          <span className="text-xs font-semibold text-slate-700 uppercase tracking-wider">Full Name</span>
-          <input
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            required
-            placeholder={role === 'reception' ? 'e.g. MedAlign Health Centre' : role === 'doctor' ? 'e.g. Dr. Sarah Ahmed' : 'e.g. Amina Yusuf'}
-            className="mt-1 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-sky-500 focus:bg-white focus:ring-2 focus:ring-sky-100"
-          />
-        </label>
+        {role === 'patient' ? (
+          <>
+            <div className="grid grid-cols-2 gap-3">
+              <label className="block">
+                <span className="text-xs font-semibold text-slate-700 uppercase tracking-wider">First Name *</span>
+                <input type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} required maxLength={50} autoComplete="given-name" className="mt-1 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-sky-500 focus:bg-white focus:ring-2 focus:ring-sky-100" />
+              </label>
+              <label className="block">
+                <span className="text-xs font-semibold text-slate-700 uppercase tracking-wider">Last Name *</span>
+                <input type="text" value={lastName} onChange={(e) => setLastName(e.target.value)} required maxLength={50} autoComplete="family-name" className="mt-1 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-sky-500 focus:bg-white focus:ring-2 focus:ring-sky-100" />
+              </label>
+            </div>
+          </>
+        ) : (
+          <label className="block">
+            <span className="text-xs font-semibold text-slate-700 uppercase tracking-wider">Full Name</span>
+            <input type="text" value={name} onChange={(e) => setName(e.target.value)} required placeholder={role === 'reception' ? 'e.g. MedAlign Health Centre' : 'e.g. Dr. Sarah Ahmed'} className="mt-1 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-sky-500 focus:bg-white focus:ring-2 focus:ring-sky-100" />
+          </label>
+        )}
 
         <label className="block">
           <span className="text-xs font-semibold text-slate-700 uppercase tracking-wider">Email Address</span>
@@ -121,15 +167,89 @@ const Register = ({ onSuccess, onRequireOtp, initialRole = 'patient', lockRole =
         </label>
 
         <label className="block">
-          <span className="text-xs font-semibold text-slate-700 uppercase tracking-wider">Phone Number</span>
+          <span className="text-xs font-semibold text-slate-700 uppercase tracking-wider">Primary Phone Number{role === 'patient' ? ' *' : ''}</span>
           <input
             type="tel"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
+            required={role === 'patient'}
             placeholder="+1 (555) 010-0000"
             className="mt-1 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-sky-500 focus:bg-white focus:ring-2 focus:ring-sky-100"
           />
         </label>
+
+        {role === 'patient' && (
+          <>
+            <label className="block">
+              <span className="text-xs font-semibold text-slate-700 uppercase tracking-wider">Secondary Phone Number</span>
+              <input type="tel" value={secondaryPhone} onChange={(e) => setSecondaryPhone(e.target.value)} maxLength={20} autoComplete="tel-national" placeholder="Optional" className="mt-1 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-sky-500 focus:bg-white focus:ring-2 focus:ring-sky-100" />
+            </label>
+
+            <label className="block">
+              <span className="text-xs font-semibold text-slate-700 uppercase tracking-wider">Age *</span>
+              <input type="number" value={age} onChange={(e) => setAge(e.target.value)} required min="0" max="120" step="1" inputMode="numeric" className="mt-1 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-sky-500 focus:bg-white focus:ring-2 focus:ring-sky-100" />
+              {age !== '' && <span className="mt-1 block text-xs text-slate-500">{getAgeBand(Number(age))}</span>}
+            </label>
+
+            <fieldset className="space-y-2">
+              <legend className="text-xs font-semibold uppercase tracking-wider text-slate-700">Who are you registering?</legend>
+              <div className="grid grid-cols-2 gap-2">
+                <label className={`flex cursor-pointer items-center gap-2 rounded-xl border px-3 py-2.5 text-sm ${!registeringForOther ? 'border-sky-500 bg-sky-50 text-sky-900' : 'border-slate-200 text-slate-700'}`}>
+                  <input type="radio" name="registering_for_other" checked={!registeringForOther} onChange={() => setRegisteringForOther(false)} />
+                  Myself
+                </label>
+                <label className={`flex cursor-pointer items-center gap-2 rounded-xl border px-3 py-2.5 text-sm ${registeringForOther ? 'border-sky-500 bg-sky-50 text-sky-900' : 'border-slate-200 text-slate-700'}`}>
+                  <input type="radio" name="registering_for_other" checked={registeringForOther} onChange={() => setRegisteringForOther(true)} />
+                  Someone else
+                </label>
+              </div>
+            </fieldset>
+
+            {registeringForOther && (
+              <label className="block">
+                <span className="text-xs font-semibold text-slate-700 uppercase tracking-wider">Your Relationship to the Patient *</span>
+                <select value={relationshipToPatient} onChange={(e) => setRelationshipToPatient(e.target.value)} required className="mt-1 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-900 outline-none transition focus:border-sky-500 focus:bg-white focus:ring-2 focus:ring-sky-100">
+                  <option value="">Choose relationship</option>
+                  <option value="mother">Mother</option>
+                  <option value="father">Father</option>
+                  <option value="guardian">Legal guardian</option>
+                  <option value="spouse">Spouse</option>
+                  <option value="child">Child</option>
+                  <option value="sibling">Sibling</option>
+                  <option value="friend">Friend</option>
+                </select>
+              </label>
+            )}
+
+            {registeringForOther && relationshipToPatient === 'friend' && (
+              <div className="grid grid-cols-2 gap-3 rounded-xl border border-sky-200 bg-sky-50 p-3">
+                <p className="col-span-2 text-xs font-semibold text-sky-900">Provide the friend’s parent or guardian contact for verification.</p>
+                <label className="block">
+                  <span className="text-xs font-semibold text-slate-700">Friend’s Parent / Guardian Name *</span>
+                  <input type="text" value={friendParentName} onChange={(e) => setFriendParentName(e.target.value)} required maxLength={100} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100" />
+                </label>
+                <label className="block">
+                  <span className="text-xs font-semibold text-slate-700">Friend’s Parent / Guardian Phone *</span>
+                  <input type="tel" value={friendParentPhone} onChange={(e) => setFriendParentPhone(e.target.value)} required maxLength={20} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100" />
+                </label>
+              </div>
+            )}
+
+            {age !== '' && Number(age) < 18 && (
+              <div className="grid grid-cols-2 gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3">
+                <p className="col-span-2 text-xs font-semibold text-amber-900">Patients under 18 need a parent or guardian contact.</p>
+                <label className="block">
+                  <span className="text-xs font-semibold text-slate-700">Parent / Guardian Name *</span>
+                  <input type="text" value={parentGuardianName} onChange={(e) => setParentGuardianName(e.target.value)} required maxLength={100} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100" />
+                </label>
+                <label className="block">
+                  <span className="text-xs font-semibold text-slate-700">Parent / Guardian Phone *</span>
+                  <input type="tel" value={parentGuardianPhone} onChange={(e) => setParentGuardianPhone(e.target.value)} required maxLength={20} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100" />
+                </label>
+              </div>
+            )}
+          </>
+        )}
 
         <label className="block">
           <span className="text-xs font-semibold text-slate-700 uppercase tracking-wider">Password</span>
@@ -178,5 +298,17 @@ const Register = ({ onSuccess, onRequireOtp, initialRole = 'patient', lockRole =
     </div>
   );
 };
+
+function getAgeBand(age) {
+  if (age <= 1) return '0–1 year · Infant / Baby';
+  if (age <= 4) return '2–4 years · Toddler / Early childhood';
+  if (age <= 9) return '5–9 years · Child';
+  if (age <= 12) return '10–12 years · Pre-teen / Early adolescent';
+  if (age <= 17) return '13–17 years · Teenager / Adolescent';
+  if (age <= 19) return '18–19 years · Young adult / Adolescent';
+  if (age <= 24) return '20–24 years · Young adult';
+  if (age <= 59) return '25–59 years · Adult';
+  return '60+ years · Older adult / Elderly';
+}
 
 export default Register;

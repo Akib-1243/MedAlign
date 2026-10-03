@@ -22,8 +22,42 @@ class AuthController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:100',
+            'first_name' => 'required_if:role,patient|string|max:50',
+            'last_name' => 'required_if:role,patient|string|max:50',
             'email' => 'required|string|email|max:100',
-            'phone' => 'nullable|string|max:20',
+            'phone' => 'required_if:role,patient|nullable|string|max:20',
+            'secondary_phone' => 'nullable|string|max:20',
+            'age' => 'required_if:role,patient|nullable|integer|min:0|max:120',
+            'registering_for_other' => 'required_if:role,patient|boolean',
+            'relationship_to_patient' => [
+                Rule::requiredIf(fn () => $request->role === 'patient' && $request->boolean('registering_for_other')),
+                'nullable',
+                Rule::in(['mother', 'father', 'guardian', 'spouse', 'child', 'sibling', 'friend']),
+            ],
+            'friend_parent_name' => [
+                Rule::requiredIf(fn () => $request->role === 'patient' && $request->boolean('registering_for_other') && $request->relationship_to_patient === 'friend'),
+                'nullable',
+                'string',
+                'max:100',
+            ],
+            'friend_parent_phone' => [
+                Rule::requiredIf(fn () => $request->role === 'patient' && $request->boolean('registering_for_other') && $request->relationship_to_patient === 'friend'),
+                'nullable',
+                'string',
+                'max:20',
+            ],
+            'parent_guardian_name' => [
+                Rule::requiredIf(fn () => $request->role === 'patient' && $request->filled('age') && (int) $request->age < 18),
+                'nullable',
+                'string',
+                'max:100',
+            ],
+            'parent_guardian_phone' => [
+                Rule::requiredIf(fn () => $request->role === 'patient' && $request->filled('age') && (int) $request->age < 18),
+                'nullable',
+                'string',
+                'max:20',
+            ],
             'password' => 'required|string|min:6',
             'password_confirmation' => 'required|string|same:password',
             'terms_accepted' => 'accepted',
@@ -45,6 +79,22 @@ class AuthController extends Controller
             ], 403);
         }
 
+        $registrationName = $request->role === 'patient'
+            ? trim($request->first_name . ' ' . $request->last_name)
+            : $request->name;
+        $patientAccountFields = $request->role === 'patient' ? [
+            'first_name' => $request->first_name,
+            'last_name' => $request->last_name,
+            'secondary_phone' => $request->secondary_phone,
+            'age' => $request->age,
+            'registering_for_other' => $request->boolean('registering_for_other'),
+            'relationship_to_patient' => $request->relationship_to_patient,
+            'parent_guardian_name' => $request->parent_guardian_name,
+            'parent_guardian_phone' => $request->parent_guardian_phone,
+            'friend_parent_name' => $request->friend_parent_name,
+            'friend_parent_phone' => $request->friend_parent_phone,
+        ] : [];
+
         // Check if user already exists
         $existingUser = User::where('email', $request->email)->first();
 
@@ -56,25 +106,25 @@ class AuthController extends Controller
                 ], 400);
             } else {
                 // Update password if requested, resend OTP
-                $existingUser->update([
-                    'name' => $request->name,
+                $existingUser->update(array_merge([
+                    'name' => $registrationName,
                     'phone' => $request->phone ?? $existingUser->phone,
                     'password' => Hash::make($request->password),
                     'role' => $request->role,
                     'clinic_id' => $request->clinic_id ?? $existingUser->clinic_id,
-                ]);
+                ], $patientAccountFields));
                 $user = $existingUser;
             }
         } else {
-            $user = User::create([
+            $user = User::create(array_merge([
                 'clinic_id' => $request->clinic_id,
-                'name' => $request->name,
+                'name' => $registrationName,
                 'email' => $request->email,
                 'phone' => $request->phone,
                 'password' => Hash::make($request->password),
                 'role' => $request->role,
                 'email_verified_at' => null,
-            ]);
+            ], $patientAccountFields));
         }
 
         // Dispatch OTP code
@@ -177,14 +227,25 @@ class AuthController extends Controller
                     ]
                 );
             } elseif ($user->role === 'patient') {
-                \App\Models\Patient::firstOrCreate(
-                    ['email' => $user->email],
-                    [
-                        'name' => $user->name,
-                        'phone' => $user->phone ?? '+1 555 0100',
-                        'gender' => 'Other',
-                    ]
-                );
+                $patient = \App\Models\Patient::firstOrNew(['email' => $user->email]);
+                $patient->name = $user->name;
+                $patient->phone = $user->phone;
+                foreach ([
+                    'first_name',
+                    'last_name',
+                    'secondary_phone',
+                    'age',
+                    'registering_for_other',
+                    'relationship_to_patient',
+                    'parent_guardian_name',
+                    'parent_guardian_phone',
+                    'friend_parent_name',
+                    'friend_parent_phone',
+                ] as $field) {
+                    $patient->{$field} = $user->{$field};
+                }
+                $patient->gender ??= 'Other';
+                $patient->save();
             }
         } else {
             return response()->json(['success' => false, 'message' => 'User account not found.'], 404);

@@ -44,11 +44,11 @@ export default function PatientPage({ authenticated, user, onLogout, onLoginClic
 
   // Patient workspace data
   const [patient, setPatient] = useState({
-    patient_id: 1,
-    name: user?.name || "Amina Yusuf",
-    phone: "+1 555 0101",
-    gender: "Female",
-    dob: "1988-04-12",
+    patient_id: null,
+    name: user?.name || "",
+    phone: user?.phone || "",
+    gender: "",
+    dob: "",
   });
 
   // Current Live Queue Token
@@ -84,45 +84,13 @@ export default function PatientPage({ authenticated, user, onLogout, onLoginClic
   }, []);
 
   const fetchWorkspace = async () => {
-    const savedTokenId = localStorage.getItem("medalign_patient_token_id");
-    if (savedTokenId) {
-      try {
-        const tokenRes = await api.get(`/patient/token/${savedTokenId}`);
-        if (tokenRes.data && tokenRes.data.success && tokenRes.data.data?.token) {
-          const t = tokenRes.data.data.token;
-          setCurrentToken({
-            token_id: t.token_id,
-            token_number: t.token_number,
-            clinic_name: t.doctor?.clinic?.name || "MedAlign Health Centre",
-            clinic_address: t.doctor?.clinic?.address || "24 Crescent Road",
-            doctor_name: t.doctor?.user?.name || "Dr. " + (t.doctor?.specialization || "Specialist"),
-            specialization: t.doctor?.specialization || "General Medicine",
-            counter_name: t.counter?.counter_name || "Room 101",
-            status: t.status,
-            check_in_time: t.check_in_time ? new Date(t.check_in_time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "10:15 AM",
-            patients_ahead: tokenRes.data.data.patients_ahead ?? 0,
-            currently_serving: tokenRes.data.data.currently_serving ?? 101,
-            est_wait_time: tokenRes.data.data.est_wait_time ?? 0,
-          });
-          if (tokenRes.data.data.telegram) {
-            setTelegram(tokenRes.data.data.telegram);
-          }
-          if (t.patient) {
-            setPatient(t.patient);
-            if (t.patient.patient_id) fetchVault(t.patient.patient_id);
-          }
-          return;
-        }
-      } catch (e) {
-        console.warn("Saved token not found or expired", e);
-      }
-    }
+    if (!user?.email) return;
 
     try {
-      const res = await api.get(`/patient/search?query=${user?.name || "Amina"}`);
+      const res = await api.get("/patient/search", { params: { query: user.email } });
       if (res.data && res.data.success) {
         if (res.data.patient) setPatient(res.data.patient);
-        if (res.data.latest_token) {
+        if (res.data.latest_token && ["waiting", "called"].includes(res.data.latest_token.status)) {
           const t = res.data.latest_token;
           setCurrentToken({
             token_id: t.token_id,
@@ -138,9 +106,8 @@ export default function PatientPage({ authenticated, user, onLogout, onLoginClic
             currently_serving: res.data.currently_serving ?? 101,
             est_wait_time: (res.data.patients_ahead ?? 2) * (t.doctor?.avg_consult_min || 15),
           });
-          if (t.token_id) {
-            localStorage.setItem("medalign_patient_token_id", String(t.token_id));
-          }
+        } else {
+          setCurrentToken(null);
         }
         if (res.data.alert_preferences) {
           setSmsAlert(Boolean(res.data.alert_preferences.sms_enabled));
@@ -216,9 +183,6 @@ export default function PatientPage({ authenticated, user, onLogout, onLoginClic
       });
       if (res.data && res.data.success && res.data.token) {
         setCurrentToken(res.data.token);
-        if (res.data.token.token_id) {
-          localStorage.setItem("medalign_patient_token_id", String(res.data.token.token_id));
-        }
         if (patient?.patient_id) fetchVault(patient.patient_id);
         setActiveTab("tracker");
       }
