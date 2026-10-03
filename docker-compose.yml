@@ -78,6 +78,8 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: http://187.52.122.100:9000/api
     image: medalign-frontend
     container_name: medalign_frontend
     restart: unless-stopped

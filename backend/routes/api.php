@@ -55,7 +55,7 @@ Route::middleware(['jwt.auth'])->prefix('auth')->group(function () {
 | - Subscription Plans
 | - Hospital Subscriptions
 | - Billing / Subscription information
-| - System Dashboard / Analytics
+| - System Dashboard / Clinic and subscription metrics
 |
 | Daily hospital operations such as doctors, patients and queues
 | are handled by the Receptionist role instead.
@@ -196,6 +196,11 @@ Route::middleware(['jwt.auth', 'role:doctor'])
         Route::post(
             '/prescription',
             [DoctorDashboardController::class, 'createPrescription']
+        );
+
+        Route::get(
+            '/patient/{patient_id}',
+            [DoctorDashboardController::class, 'patientDetails']
         );
 
         Route::get(
@@ -352,6 +357,11 @@ Route::get(
 );
 
 Route::get(
+    '/doctors/{doctorId}',
+    [PatientController::class, 'getDoctorDetails']
+);
+
+Route::get(
     '/plans',
     [PatientController::class, 'getSubscriptionPlans']
 );
@@ -391,4 +401,3 @@ Route::delete(
     '/items/{id}',
     [UsersController::class, 'destroy']
 );
-

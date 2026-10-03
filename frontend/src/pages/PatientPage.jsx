@@ -4,10 +4,8 @@ import {
   Clock,
   AlertCircle,
   Bell,
-  CheckCircle,
   FileText,
   Search,
-  MessageSquare,
   ShieldCheck,
   ChevronRight,
   Printer,
@@ -17,6 +15,7 @@ import {
   Building2,
   RefreshCw,
   ArrowRight,
+  CalendarClock,
   Sparkles,
   BrainCircuit,
   Lightbulb,
@@ -56,14 +55,14 @@ export default function PatientPage({ authenticated, user, onLogout, onLoginClic
   const [isBooking, setIsBooking] = useState(false);
   const [doctorsList, setDoctorsList] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedDoctor, setSelectedDoctor] = useState(null);
+  const [isLoadingDoctorDetails, setIsLoadingDoctorDetails] = useState(false);
+  const [doctorDetailsError, setDoctorDetailsError] = useState("");
 
   // Alert Settings
-  const [smsAlert, setSmsAlert] = useState(true);
-  const [whatsappAlert, setWhatsappAlert] = useState(true);
   const [telegramAlert, setTelegramAlert] = useState(true);
-  const [telegram, setTelegram] = useState({ linked: false, bot_link: null });
-  const [alertThreshold, setAlertThreshold] = useState(3);
-  const [alertSavedToast, setAlertSavedToast] = useState(false);
+  const [alertsError, setAlertsError] = useState("");
+  const [isSavingAlerts, setIsSavingAlerts] = useState(false);
 
   // Medical Vault & Prescriptions
   const [dbPrescriptions, setDbPrescriptions] = useState([]);
@@ -110,13 +109,7 @@ export default function PatientPage({ authenticated, user, onLogout, onLoginClic
           setCurrentToken(null);
         }
         if (res.data.alert_preferences) {
-          setSmsAlert(Boolean(res.data.alert_preferences.sms_enabled));
-          setWhatsappAlert(Boolean(res.data.alert_preferences.whatsapp_enabled));
           setTelegramAlert(res.data.alert_preferences.telegram_enabled ?? true);
-          setAlertThreshold(res.data.alert_preferences.near_turn_threshold || 3);
-        }
-        if (res.data.telegram) {
-          setTelegram(res.data.telegram);
         }
         if (res.data.patient?.patient_id) {
           fetchVault(res.data.patient.patient_id);
@@ -135,6 +128,25 @@ export default function PatientPage({ authenticated, user, onLogout, onLoginClic
       }
     } catch {
       setDoctorsList([]);
+    }
+  };
+
+  const openDoctorDetails = async (doctorId) => {
+    setSelectedDoctor(null);
+    setDoctorDetailsError("");
+    setIsLoadingDoctorDetails(true);
+
+    try {
+      const res = await api.get(`/doctors/${doctorId}`);
+      if (res.data?.success) {
+        setSelectedDoctor(res.data.data);
+      } else {
+        setDoctorDetailsError(res.data?.message || "Doctor details could not be loaded.");
+      }
+    } catch (e) {
+      setDoctorDetailsError(e?.response?.data?.message || "Doctor details could not be loaded.");
+    } finally {
+      setIsLoadingDoctorDetails(false);
     }
   };
 
@@ -193,19 +205,26 @@ export default function PatientPage({ authenticated, user, onLogout, onLoginClic
     }
   };
 
-  const handleSaveAlerts = async () => {
+  const handleTelegramAlertChange = async (enabled) => {
+    if (!patient.patient_id) {
+      setAlertsError("Sign in with your patient account to change notification preferences.");
+      return;
+    }
+
+    const previousValue = telegramAlert;
+    setTelegramAlert(enabled);
+    setIsSavingAlerts(true);
+    setAlertsError("");
     try {
       await api.post(`/patient/${patient.patient_id}/alerts`, {
-        sms_enabled: smsAlert,
-        whatsapp_enabled: whatsappAlert,
-        telegram_enabled: telegramAlert,
-        near_turn_threshold: alertThreshold,
+        telegram_enabled: enabled,
       });
     } catch (e) {
-      console.warn("Failed to save alerts online", e);
+      setTelegramAlert(previousValue);
+      setAlertsError(e?.response?.data?.message || "Could not update Telegram notifications. Please try again.");
+    } finally {
+      setIsSavingAlerts(false);
     }
-    setAlertSavedToast(true);
-    setTimeout(() => setAlertSavedToast(false), 3500);
   };
 
   // ══ AI Doctor Symptom Analysis ══
@@ -375,11 +394,22 @@ export default function PatientPage({ authenticated, user, onLogout, onLoginClic
                             </span>
                             <Stethoscope className="w-4 h-4 text-sky-600" />
                           </div>
-                          <h5 className="text-base font-bold text-slate-900 mt-3">{doc.name}</h5>
+                          <button
+                            onClick={() => openDoctorDetails(doc.id)}
+                            className="mt-3 text-left text-base font-bold text-slate-900 hover:text-sky-700 hover:underline underline-offset-4"
+                          >
+                            {doc.name}
+                          </button>
                           <p className="text-xs font-semibold text-sky-700">{doc.specialty || doc.specialization}</p>
                           <p className="text-xs text-slate-500 mt-1 flex items-center gap-1">
                             <Building2 className="w-3.5 h-3.5 text-slate-400" /> {doc.clinic || "MedAlign Health Centre"}
                           </p>
+                          <button
+                            onClick={() => openDoctorDetails(doc.id)}
+                            className="mt-3 text-xs font-bold text-sky-700 hover:text-indigo-700 hover:underline underline-offset-4"
+                          >
+                            View doctor details
+                          </button>
                         </div>
 
                         <button
@@ -626,10 +656,15 @@ export default function PatientPage({ authenticated, user, onLogout, onLoginClic
                     </div>
                   )}
 
-                  {aiResult.alternative_specialties?.length > 0 && (
-                    <p className="text-xs text-slate-600">
-                      Other specialties that may be relevant: {aiResult.alternative_specialties.join(", ")}.
-                    </p>
+                  {aiResult.recommended_specialties?.length > 1 && (
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600">
+                      <span className="font-semibold text-slate-700">Relevant specialties:</span>
+                      {aiResult.recommended_specialties.map((specialty) => (
+                        <span key={specialty} className="rounded-full border border-purple-200 bg-purple-50 px-2.5 py-1 font-semibold text-purple-800">
+                          {specialty}
+                        </span>
+                      ))}
+                    </div>
                   )}
 
                   {aiResult.disclaimer && <p className="text-xs text-slate-500">{aiResult.disclaimer}</p>}
@@ -709,108 +744,35 @@ export default function PatientPage({ authenticated, user, onLogout, onLoginClic
         {/* ══ TAB 3: ALERT PREFERENCES ══ */}
         {activeTab === "alerts" && (
           <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }} className="space-y-6">
-            <div className="p-6 sm:p-8 rounded-3xl bg-white border border-slate-200/90 shadow-xl space-y-6">
-              <div>
-                <h2 className="text-2xl font-bold text-slate-950">Queue Alert Settings</h2>
-                <p className="text-xs text-slate-500 mt-1">
-                  Choose how MedAlign notifies you when your consultation turn is approaching.
+            <div className="rounded-3xl border border-slate-200/90 bg-white p-6 shadow-xl sm:p-8">
+              <div className="flex items-center justify-between gap-4">
+                <span className="text-base font-bold text-slate-900">Telegram notifications</span>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-label="Telegram notifications"
+                  aria-checked={telegramAlert}
+                  onClick={() => handleTelegramAlertChange(!telegramAlert)}
+                  disabled={isSavingAlerts || !patient.patient_id}
+                  className={`relative inline-flex h-8 w-14 shrink-0 items-center rounded-full transition-colors disabled:cursor-wait disabled:opacity-60 ${
+                    telegramAlert ? "bg-sky-600" : "bg-slate-300"
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-6 w-6 transform rounded-full bg-white shadow transition-transform ${
+                      telegramAlert ? "translate-x-7" : "translate-x-1"
+                    }`}
+                  />
+                </button>
+              </div>
+              {alertsError && (
+                <p role="alert" className="mt-3 text-xs font-medium text-red-700">
+                  {alertsError}
                 </p>
-              </div>
-
-              {alertSavedToast && (
-                <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold flex items-center gap-2">
-                  <CheckCircle className="w-4 h-4 text-emerald-600" /> Alert preferences saved successfully.
-                </div>
               )}
-
-              <div className="space-y-4">
-                <div className="flex items-center justify-between p-4 rounded-2xl bg-slate-50 border border-slate-200">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center font-bold">SMS</div>
-                    <div>
-                      <p className="text-sm font-bold text-slate-900">SMS Notifications</p>
-                      <p className="text-xs text-slate-500">Receive dispatch alerts on {patient.phone}</p>
-                    </div>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={smsAlert}
-                    onChange={(e) => setSmsAlert(e.target.checked)}
-                    className="w-5 h-5 accent-sky-600 cursor-pointer"
-                  />
-                </div>
-
-                <div className="flex items-center justify-between p-4 rounded-2xl bg-slate-50 border border-slate-200">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold"><MessageSquare className="w-5 h-5" /></div>
-                    <div>
-                      <p className="text-sm font-bold text-slate-900">WhatsApp Dispatch</p>
-                      <p className="text-xs text-slate-500">Receive real-time arrival reminders on WhatsApp</p>
-                    </div>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={whatsappAlert}
-                    onChange={(e) => setWhatsappAlert(e.target.checked)}
-                    className="w-5 h-5 accent-emerald-600 cursor-pointer"
-                  />
-                </div>
-
-                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-sky-100 text-sky-700 flex items-center justify-center"><Send className="w-5 h-5" /></div>
-                      <div>
-                        <p className="text-sm font-bold text-slate-900">Telegram Alerts</p>
-                        <p className="text-xs text-slate-500">
-                          {telegram.linked
-                            ? "Connected. You'll be messaged when your turn is near and when you're called."
-                            : `Not connected yet. Open our bot and share ${patient.phone} to start receiving alerts.`}
-                        </p>
-                      </div>
-                    </div>
-                    <input
-                      type="checkbox"
-                      checked={telegramAlert}
-                      onChange={(e) => setTelegramAlert(e.target.checked)}
-                      className="w-5 h-5 accent-sky-600 cursor-pointer"
-                    />
-                  </div>
-                  {!telegram.linked && telegram.bot_link && (
-                    <a
-                      href={telegram.bot_link}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-sky-600 text-white text-xs font-bold hover:bg-sky-500"
-                    >
-                      <Send className="w-4 h-4" /> Connect Telegram
-                    </a>
-                  )}
-                </div>
-
-                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm font-bold text-slate-900">Near-Turn Dispatch Threshold</span>
-                    <span className="text-xs font-bold text-sky-700 bg-sky-50 px-3 py-1 rounded-full border border-sky-200">{alertThreshold} patients ahead</span>
-                  </div>
-                  <input
-                    type="range"
-                    min={1}
-                    max={6}
-                    value={alertThreshold}
-                    onChange={(e) => setAlertThreshold(+e.target.value)}
-                    className="w-full accent-sky-600 cursor-pointer"
-                  />
-                  <p className="text-[11px] text-slate-500">You will receive an urgent reminder once your queue position reaches {alertThreshold} or less.</p>
-                </div>
-              </div>
-
-              <button
-                onClick={handleSaveAlerts}
-                className="px-6 py-3 rounded-2xl bg-gradient-to-r from-sky-700 to-indigo-600 text-white text-xs font-bold shadow-md cursor-pointer hover:from-sky-600 hover:to-indigo-500"
-              >
-                Save Preferences
-              </button>
+              {isSavingAlerts && (
+                <p className="mt-3 text-xs text-slate-500">Saving…</p>
+              )}
             </div>
           </motion.div>
         )}
@@ -1006,6 +968,136 @@ export default function PatientPage({ authenticated, user, onLogout, onLoginClic
           )}
         </AnimatePresence>
       </main>
+
+      {(isLoadingDoctorDetails || selectedDoctor || doctorDetailsError) && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 backdrop-blur-sm p-4">
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="doctor-details-title"
+            className="my-6 max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl sm:p-8"
+          >
+            <div className="flex items-start justify-between gap-4 border-b border-slate-100 pb-5">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wider text-sky-600">Clinician Profile</p>
+                <h2 id="doctor-details-title" className="mt-1 text-2xl font-bold text-slate-950">
+                  {selectedDoctor?.name || "Doctor Details"}
+                </h2>
+              </div>
+              <button
+                onClick={() => {
+                  setSelectedDoctor(null);
+                  setDoctorDetailsError("");
+                }}
+                aria-label="Close doctor details"
+                className="rounded-full p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {isLoadingDoctorDetails ? (
+              <div className="py-12 text-center text-sm text-slate-500">Loading doctor profile…</div>
+            ) : doctorDetailsError ? (
+              <div role="alert" className="mt-5 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                {doctorDetailsError}
+              </div>
+            ) : selectedDoctor ? (
+              <div className="mt-6 space-y-5">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-bold text-sky-800">
+                    {selectedDoctor.specialty}
+                  </span>
+                  <span className={`rounded-full border px-3 py-1 text-xs font-bold ${
+                    selectedDoctor.availability === "Available today"
+                      ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                      : "border-slate-200 bg-slate-100 text-slate-700"
+                  }`}>
+                    {selectedDoctor.availability}
+                  </span>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <DoctorDetail
+                    icon={<Building2 className="h-4 w-4" />}
+                    label="Clinic"
+                    value={selectedDoctor.clinic?.name}
+                  />
+                  <DoctorDetail
+                    icon={<MapPin className="h-4 w-4" />}
+                    label="Clinic address"
+                    value={selectedDoctor.clinic?.address}
+                  />
+                  <DoctorDetail
+                    icon={<Clock className="h-4 w-4" />}
+                    label="Typical consultation"
+                    value={`${selectedDoctor.avg_consult_min || 15} minutes`}
+                  />
+                  {selectedDoctor.clinic?.phone && (
+                    <DoctorDetail
+                      icon={<Stethoscope className="h-4 w-4" />}
+                      label="Clinic phone"
+                      value={selectedDoctor.clinic.phone}
+                    />
+                  )}
+                </div>
+
+                <div>
+                  <div className="flex items-center gap-2">
+                    <CalendarClock className="h-4 w-4 text-sky-700" />
+                    <h3 className="text-sm font-bold text-slate-900">Clinic schedule</h3>
+                  </div>
+                  {selectedDoctor.schedule?.length ? (
+                    <ul className="mt-3 divide-y divide-slate-100 rounded-2xl border border-slate-200">
+                      {selectedDoctor.schedule.map((slot, index) => (
+                        <li key={`${slot.day}-${slot.start_time}-${index}`} className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
+                          <span className="font-semibold text-slate-800">{slot.day}</span>
+                          <span className="text-slate-600">{formatScheduleTime(slot.start_time)} – {formatScheduleTime(slot.end_time)}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
+                      Schedule details have not been published.
+                    </p>
+                  )}
+                </div>
+
+                <button
+                  disabled={isBooking || selectedDoctor.availability !== "Available today"}
+                  onClick={() => {
+                    const doctorId = selectedDoctor.id;
+                    setSelectedDoctor(null);
+                    handleBookToken(doctorId);
+                  }}
+                  className="w-full rounded-xl bg-gradient-to-r from-sky-700 to-indigo-600 px-4 py-3 text-sm font-bold text-white shadow-md transition hover:from-sky-600 hover:to-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Get Live Token
+                </button>
+              </div>
+            ) : null}
+          </section>
+        </div>
+      )}
     </div>
   );
+}
+
+function DoctorDetail({ icon, label, value }) {
+  return (
+    <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+      <div className="flex items-center gap-2 text-slate-500">
+        {icon}
+        <span className="text-[11px] font-bold uppercase tracking-wide">{label}</span>
+      </div>
+      <p className="mt-2 break-words text-sm font-semibold text-slate-900">{value || "Not provided"}</p>
+    </div>
+  );
+}
+
+function formatScheduleTime(value) {
+  if (!value) return "—";
+  const [hours, minutes] = value.split(":");
+  return new Intl.DateTimeFormat("en", { hour: "numeric", minute: "2-digit" })
+    .format(new Date(2000, 0, 1, Number(hours), Number(minutes)));
 }

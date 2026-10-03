@@ -221,6 +221,47 @@ class PatientController extends Controller
     }
 
     /**
+     * Public details for a doctor shown in the patient portal.
+     */
+    public function getDoctorDetails($doctorId)
+    {
+        $doctor = \App\Models\Doctor::with(['user', 'clinic'])->find($doctorId);
+
+        if (!$doctor) {
+            return response()->json(['success' => false, 'message' => 'Doctor not found.'], 404);
+        }
+
+        $schedule = DB::table('doctor_schedules')
+            ->where('doctor_id', $doctor->doctor_id)
+            ->orderByRaw("FIELD(day_of_week, 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday')")
+            ->orderBy('start_time')
+            ->get(['day_of_week', 'start_time', 'end_time'])
+            ->map(fn ($slot) => [
+                'day' => $slot->day_of_week,
+                'start_time' => $slot->start_time,
+                'end_time' => $slot->end_time,
+            ])
+            ->values();
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'id' => $doctor->doctor_id,
+                'name' => $doctor->user?->name ?? 'Dr. ' . $doctor->specialization,
+                'specialty' => $doctor->specialization,
+                'availability' => $doctor->availability_status === 'available' ? 'Available today' : 'Unavailable',
+                'avg_consult_min' => $doctor->avg_consult_min ?? 15,
+                'clinic' => [
+                    'name' => $doctor->clinic?->name ?? 'MedAlign Health Centre',
+                    'address' => $doctor->clinic?->address,
+                    'phone' => $doctor->clinic?->phone,
+                ],
+                'schedule' => $schedule,
+            ],
+        ]);
+    }
+
+    /**
      * Public Subscription Plans Endpoint (backed by database `subscription_plans` table).
      */
     public function getSubscriptionPlans()

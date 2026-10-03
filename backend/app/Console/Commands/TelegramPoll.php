@@ -24,11 +24,17 @@ class TelegramPoll extends Command
 
         // getUpdates does not work while a webhook is registered.
         try {
-            $telegram->call('deleteWebhook');
+            $response = $telegram->call('deleteWebhook');
         } catch (\Throwable $e) {
             $this->error('Cannot reach Telegram: ' . $telegram->redact($e->getMessage()));
             return self::FAILURE;
         }
+
+        if (!$response->successful() || !$response->json('ok')) {
+            $this->error('Telegram rejected deleteWebhook: ' . ($response->json('description') ?? 'HTTP ' . $response->status()));
+            return self::FAILURE;
+        }
+
         $this->info('Polling Telegram for updates. Press Ctrl+C to stop.');
 
         $offset = 0;
@@ -41,6 +47,12 @@ class TelegramPoll extends Command
                 ], 30);
             } catch (\Throwable $e) {
                 $this->warn($telegram->redact($e->getMessage()));
+                sleep(3);
+                continue;
+            }
+
+            if (!$response->successful() || !$response->json('ok')) {
+                $this->warn('Telegram getUpdates failed: ' . ($response->json('description') ?? 'HTTP ' . $response->status()));
                 sleep(3);
                 continue;
             }

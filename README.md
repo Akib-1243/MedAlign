@@ -185,10 +185,15 @@ docker compose up --build
 
 This starts the application stack, including:
 
+- MedAlign frontend on `http://localhost:5173`
 - Laravel backend on `http://localhost:8000`
 - MySQL database on `localhost:3307`
 - Mailpit on `http://localhost:8025`
 - phpMyAdmin on `http://localhost:8080`
+
+The frontend is served by the Vite container; no separate `npm run dev` process
+is needed. Source changes in `frontend/` are mounted into the container for hot
+reload during development.
 
 Then run backend migrations and seed data:
 
@@ -201,6 +206,51 @@ If the app container is not already running or you need to initialize from scrat
 ```bash
 docker compose run --rm app php artisan migrate --seed
 ```
+
+### Telegram queue notifications (local development)
+
+Telegram alerts use a bot you create with Telegram's official `@BotFather`.
+Do not share the bot token: anyone who has it can control the bot.
+
+1. In Telegram, open `@BotFather`, send `/newbot`, and follow its prompts. Save
+   the bot token and the bot username it gives you.
+2. In `backend/.env`, set the values (use the username without `@`):
+
+   ```env
+   TELEGRAM_BOT_TOKEN=your_bot_token
+   TELEGRAM_BOT_USERNAME=your_bot_username
+   TELEGRAM_WEBHOOK_SECRET=
+   ```
+
+   `backend/.env` is ignored by Git. Keep the token there and do not commit it.
+3. From the project root, clear cached Laravel configuration and verify the
+   token with Telegram. This check calls `getMe`; it does not message anyone:
+
+   ```bash
+   docker compose exec app php artisan config:clear
+   docker compose exec app php artisan telegram:status
+   ```
+
+   The status command should report that the bot is reachable.
+4. Start the local Telegram update listener:
+
+   ```bash
+   docker compose --profile telegram up -d telegram-poller
+   docker compose logs -f telegram-poller
+   ```
+
+   The poller needs to stay running to receive the phone number users share
+   with the bot. Local polling removes any Telegram webhook, so do not run it
+   alongside a webhook-based deployment.
+5. On the phone, install/open Telegram and sign in to the account whose phone
+   number is registered with the clinic. Open the MedAlign patient portal,
+   sign in, go to **Telegram Alerts**, and tap **Connect Telegram**. In the bot
+   chat, press **Start**, then **Share phone number** and confirm sharing your
+   own number. The portal should show that Telegram is connected; leave the
+   Telegram alert toggle enabled.
+6. When a doctor calls a patient or three or fewer patients are ahead in the
+   queue, MedAlign sends the notification to that linked chat.
+   To stop alerts, turn them off in the portal or send `/stop` to the bot.
 
 ---
 
@@ -245,7 +295,7 @@ Start the Laravel API:
 php artisan serve --host=0.0.0.0 --port=8000
 ```
 
-#### 3. Set up frontend
+#### 3. Set up frontend (optional, non-Docker development)
 
 ```bash
 cd ../frontend

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Services\QueueNotificationService;
 use App\Models\Doctor;
+use App\Models\Patient;
 use App\Models\QueueToken;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -61,6 +62,7 @@ class DoctorDashboardController extends Controller
             ],
             'recent_prescriptions' => $doctor->prescriptions()->with('patient')->latest('issued_at')->limit(4)->get()->map(fn ($prescription) => [
                 'id' => $prescription->prescription_id,
+                'patient_id' => $prescription->patient?->patient_id,
                 'patient' => $prescription->patient ? $prescription->patient->name : 'Patient',
                 'issued_at' => $prescription->issued_at?->toIso8601String(),
             ]),
@@ -274,8 +276,14 @@ class DoctorDashboardController extends Controller
      */
     public function patientHistory(Request $request, $patient_id)
     {
-        $prescriptions = \App\Models\Prescription::with(['doctor.user', 'items'])
-            ->where('patient_id', $patient_id)
+        $doctor = $this->doctorFor($request);
+        $patient = $doctor ? $this->patientForDoctor($doctor, $patient_id) : null;
+
+        if (!$patient) {
+            return response()->json(['message' => 'Patient not found.'], 404);
+        }
+
+        $prescriptions = $patient->prescriptions()->with(['doctor.user', 'items'])
             ->orderBy('issued_at', 'desc')
             ->get()
             ->map(fn ($rx) => [
@@ -298,5 +306,75 @@ class DoctorDashboardController extends Controller
             'success' => true,
             'data'    => $prescriptions,
         ]);
+    }
+
+    /**
+     * Get a patient's full profile and prescription history for an assigned doctor.
+     */
+    public function patientDetails(Request $request, $patient_id)
+    {
+        $doctor = $this->doctorFor($request);
+        $patient = $doctor ? $this->patientForDoctor($doctor, $patient_id) : null;
+
+        if (!$patient) {
+            return response()->json(['message' => 'Patient not found.'], 404);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'patient' => [
+                    'id' => $patient->patient_id,
+                    'name' => $patient->name,
+                    'first_name' => $patient->first_name,
+                    'last_name' => $patient->last_name,
+                    'phone' => $patient->phone,
+                    'secondary_phone' => $patient->secondary_phone,
+                    'email' => $patient->email,
+                    'date_of_birth' => $patient->date_of_birth ?? $patient->dob,
+                    'age' => $patient->age,
+                    'gender' => $patient->gender,
+                    'marital_status' => $patient->marital_status,
+                    'blood_group' => $patient->blood_group,
+                    'allergies' => $patient->allergies,
+                    'address' => $patient->address,
+                    'emergency_contact_name' => $patient->emergency_contact_name,
+                    'emergency_contact_phone' => $patient->emergency_contact_phone,
+                    'registering_for_other' => (bool) $patient->registering_for_other,
+                    'relationship_to_patient' => $patient->relationship_to_patient,
+                    'parent_guardian_name' => $patient->parent_guardian_name,
+                    'parent_guardian_phone' => $patient->parent_guardian_phone,
+                    'friend_parent_name' => $patient->friend_parent_name,
+                    'friend_parent_phone' => $patient->friend_parent_phone,
+                ],
+                'prescriptions' => $patient->prescriptions()
+                    ->with(['doctor.user', 'items'])
+                    ->orderBy('issued_at', 'desc')
+                    ->get()
+                    ->map(fn ($rx) => [
+                        'id' => $rx->prescription_id,
+                        'issued_at' => $rx->issued_at?->toIso8601String(),
+                        'doctor_name' => $rx->doctor?->user?->name ?? 'Doctor',
+                        'notes' => $rx->notes ?? '',
+                        'items' => $rx->items->map(fn ($item) => [
+                            'medicine_name' => $item->medicine_name,
+                            'dosage' => $item->dosage,
+                            'frequency' => $item->frequency,
+                            'duration' => $item->duration,
+                            'instructions' => $item->instructions,
+                        ])->values(),
+                    ])->values(),
+            ],
+        ]);
+    }
+
+    private function patientForDoctor(Doctor $doctor, int|string $patientId): ?Patient
+    {
+        return Patient::where('patient_id', $patientId)
+            ->where(function ($query) use ($doctor) {
+                $query->whereHas('queueTokens', fn ($tokens) => $tokens->where('doctor_id', $doctor->doctor_id))
+                    ->orWhereHas('prescriptions', fn ($prescriptions) => $prescriptions->where('doctor_id', $doctor->doctor_id));
+            })
+            ->first();
     }
 }

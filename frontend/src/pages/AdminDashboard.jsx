@@ -1,13 +1,10 @@
 import { useEffect, useState } from "react";
 
 import {
-  Activity,
   BarChart3,
   CheckCircle2,
-  Clock3,
   RefreshCw,
   Stethoscope,
-  TrendingUp,
   LogOut,
   Plus,
   X,
@@ -133,7 +130,7 @@ function AdminDashboard({ onBack, onLogout }) {
     try {
       const res = await api.get("/admin/dashboard-stats");
       const data = res.data?.original || res.data;
-      if (!data?.queue_snapshot || !data?.doctor_activity || !data?.subscription_status || !data?.analytics) {
+      if (!data?.doctor_activity || !data?.subscription_status) {
         throw new Error("The dashboard response is missing required data.");
       }
       setDashboard(data);
@@ -152,7 +149,7 @@ function AdminDashboard({ onBack, onLogout }) {
     try {
       const res = await api.get("/admin/clinics");
 
-      setClinics(res.data.data || []);
+      setClinics(res.data.clinics || []);
     } catch (e) {
       setClinicError(
         e?.response?.data?.message ||
@@ -437,9 +434,7 @@ function AdminDashboard({ onBack, onLogout }) {
 
   // ── Derived values ─────────────────────────────────────────────────────
 
-  const qs = dashboard?.queue_snapshot ?? {};
   const da = dashboard?.doctor_activity ?? {};
-  const an = dashboard?.analytics ?? {};
   const sub = dashboard?.subscription_status ?? {};
 
   const doctorPct =
@@ -572,92 +567,40 @@ function AdminDashboard({ onBack, onLogout }) {
             <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
 
               <KPICard
-                icon={<Clock3 />}
-                tone="amber"
-                label="Live Waiting Queue"
-                value={qs.waiting ?? "—"}
-                sub={`${qs.total ?? "—"} total tokens registered`}
+                icon={<Building2 />}
+                tone="green"
+                label="Active Clinics"
+                value={sub.active_clinics ?? "—"}
+                sub={`${sub.total_clinics ?? "—"} clinics registered`}
               />
 
               <KPICard
                 icon={<Stethoscope />}
-                tone="green"
-                label="Active Clinicians"
-                value={da.available ?? "—"}
-                sub={`${da.total_doctors ?? "—"} doctors rostered`}
-              />
-
-              <KPICard
-                icon={<TrendingUp />}
                 tone="sky"
-                label="Avg Wait Time"
-                value={an.average_wait_time === undefined ? "—" : `${an.average_wait_time}m`}
-                sub="Average wait duration"
+                label="Registered Doctors"
+                value={da.total_doctors ?? "—"}
+                sub="Across the platform"
               />
 
               <KPICard
-                icon={<Activity />}
+                icon={<CreditCard />}
                 tone="purple"
-                label="Walkout Rate"
-                value={an.average_walkout_rate === undefined ? "—" : `${an.average_walkout_rate}%`}
-                sub="Real-time target metric"
+                label="Subscription Plans"
+                value={sub.total_plans ?? "—"}
+                sub="Available platform plans"
+              />
+
+              <KPICard
+                icon={<Building2 />}
+                tone="amber"
+                label="Inactive Clinics"
+                value={sub.inactive_clinics ?? "—"}
+                sub="Clinics needing attention"
               />
 
             </section>
 
-            <section className="grid gap-6 lg:grid-cols-2">
-
-              {/* Queue Snapshot */}
-
-              <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-
-                <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-
-                  <div>
-                    <h2 className="text-lg font-bold text-slate-950">
-                      Queue Snapshot (Database Live)
-                    </h2>
-
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      Queue counts from the latest database snapshot
-                    </p>
-                  </div>
-
-                  <LiveDot isLive={Boolean(dashboard) && !dashboardError} />
-
-                </div>
-
-                <div className="mt-6 space-y-3">
-
-                  <QueueRow
-                    color="bg-amber-500"
-                    label="Waiting in Lobby"
-                    sub="Awaiting consultation"
-                    value={qs.waiting ?? "—"}
-                    bg="border-amber-100 bg-amber-50/40"
-                    valueColor="text-amber-700"
-                  />
-
-                  <QueueRow
-                    color="bg-sky-500"
-                    label="In Consultation"
-                    sub="Currently called with doctor"
-                    value={qs.called ?? "—"}
-                    bg="border-sky-100 bg-sky-50/40"
-                    valueColor="text-sky-700"
-                  />
-
-                  <QueueRow
-                    color="bg-emerald-500"
-                    label="Completed Encounters"
-                    sub="Consultation finished"
-                    value={qs.completed ?? "—"}
-                    bg="border-emerald-100 bg-emerald-50/40"
-                    valueColor="text-emerald-700"
-                  />
-
-                </div>
-              </div>
+            <section className="grid gap-6">
 
               {/* Doctor Roster */}
 
@@ -731,9 +674,7 @@ function AdminDashboard({ onBack, onLogout }) {
 
             </section>
 
-            {/* Analytics */}
-
-            <section className="grid gap-6 lg:grid-cols-2">
+            <section className="grid gap-6">
 
               <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
 
@@ -785,62 +726,6 @@ function AdminDashboard({ onBack, onLogout }) {
                     <p className="mt-1 text-xs text-slate-600 font-medium">
                       Total Clinics
                     </p>
-                  </div>
-
-                </div>
-              </div>
-
-              <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-
-                <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-
-                  <div>
-                    <h2 className="text-lg font-bold text-slate-950">
-                      Performance Benchmarks
-                    </h2>
-
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      {an.analytics_days ?? "—"}-day operational aggregate
-                    </p>
-                  </div>
-
-                  <Activity className="h-5 w-5 text-indigo-600" />
-
-                </div>
-
-                <div className="mt-6 space-y-4">
-
-                  <ProgressBar
-                    label="Service Efficiency Rating"
-                    value={dashboard ? Math.max(0, 100 - an.average_walkout_rate) : null}
-                    color="from-sky-500 to-indigo-600"
-                    textColor="text-sky-700"
-                  />
-
-                  <ProgressBar
-                    label="Wait Threshold (Max 30m)"
-                    value={dashboard ? Math.min(100, (an.average_wait_time / 30) * 100) : null}
-                    color="from-emerald-400 to-emerald-600"
-                    textColor="text-emerald-700"
-                    suffix={dashboard ? `${an.average_wait_time} min` : "Data unavailable"}
-                  />
-
-                  <div className="pt-2 flex justify-between text-xs text-slate-500 border-t border-slate-100">
-
-                    <span>
-                      Total patients evaluated:{" "}
-                      <strong className="text-slate-800">
-                        {an.total_patients ?? "—"}
-                      </strong>
-                    </span>
-
-                    <span>
-                      Days monitored:{" "}
-                      <strong className="text-slate-800">
-                        {an.analytics_days ?? "—"}
-                      </strong>
-                    </span>
-
                   </div>
 
                 </div>
@@ -993,6 +878,33 @@ function AdminDashboard({ onBack, onLogout }) {
                         </span>
                       </div>
 
+                    </div>
+
+                    <div className="mt-5 rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
+                      <h4 className="mb-3 text-xs font-bold uppercase tracking-wide text-slate-600">
+                        Recent records
+                      </h4>
+                      <div className="grid gap-3 sm:grid-cols-3">
+                        <RecentClinicRecord
+                          label="Hospital"
+                          name={clinic.name}
+                          date={clinic.created_at}
+                          dateLabel="Registered"
+                        />
+                        <RecentClinicRecord
+                          label="Doctor"
+                          name={clinic.recent_doctor_name}
+                          detail={clinic.recent_doctor_specialty}
+                          date={clinic.recent_doctor_created_at}
+                          dateLabel="Added"
+                        />
+                        <RecentClinicRecord
+                          label="Patient"
+                          name={clinic.recent_patient_name}
+                          date={clinic.recent_patient_seen_at}
+                          dateLabel="Last visit"
+                        />
+                      </div>
                     </div>
 
                     <div className="mt-5 flex gap-2 border-t border-slate-100 pt-4">
@@ -1714,45 +1626,23 @@ function KPICard({
   );
 }
 
-function QueueRow({
-  color,
-  label,
-  sub,
-  value,
-  bg,
-  valueColor,
-}) {
+function RecentClinicRecord({ label, name, detail, date, dateLabel }) {
   return (
-    <div
-      className={`flex items-center justify-between rounded-2xl border p-4 ${bg}`}
-    >
-
-      <div className="flex items-center gap-3">
-
-        <div
-          className={`h-3 w-3 rounded-full ${color}`}
-        />
-
-        <div>
-
-          <p className="text-sm font-semibold text-slate-900">
-            {label}
-          </p>
-
-          <p className="text-xs text-slate-500">
-            {sub}
-          </p>
-
-        </div>
-
-      </div>
-
-      <span
-        className={`text-xl font-bold ${valueColor}`}
-      >
-        {value}
-      </span>
-
+    <div className="min-w-0 rounded-xl border border-slate-200 bg-white p-3">
+      <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">
+        {label}
+      </p>
+      <p className="mt-1 truncate text-xs font-semibold text-slate-900">
+        {name || `No ${label.toLowerCase()} records`}
+      </p>
+      {detail && (
+        <p className="mt-0.5 truncate text-[11px] text-slate-500">{detail}</p>
+      )}
+      {date && (
+        <p className="mt-1 text-[10px] text-slate-500">
+          {dateLabel}: {fmtDate(date)}
+        </p>
+      )}
     </div>
   );
 }
@@ -1789,60 +1679,6 @@ function RosterRow({
       {badge}
 
     </div>
-  );
-}
-
-function ProgressBar({
-  label,
-  value,
-  color,
-  textColor,
-  suffix,
-}) {
-  const hasValue = Number.isFinite(value);
-
-  return (
-    <div>
-
-      <div className="mb-1.5 flex justify-between text-xs font-semibold">
-
-        <span className="text-slate-700">
-          {label}
-        </span>
-
-        <span className={`font-bold ${textColor}`}>
-          {suffix || (hasValue ? `${Math.round(value)}%` : "—")}
-        </span>
-
-      </div>
-
-      <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
-
-        <div
-          className={`h-2 rounded-full bg-gradient-to-r ${color}`}
-          style={{
-            width: `${hasValue ? Math.max(
-              0,
-              Math.min(100, value)
-            ) : 0}%`,
-          }}
-        />
-
-      </div>
-
-    </div>
-  );
-}
-
-function LiveDot({ isLive }) {
-  return (
-    <span className="flex h-3 w-3 relative">
-
-      {isLive && <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />}
-
-      <span className={`relative inline-flex h-3 w-3 rounded-full ${isLive ? "bg-emerald-500" : "bg-slate-300"}`} />
-
-    </span>
   );
 }
 

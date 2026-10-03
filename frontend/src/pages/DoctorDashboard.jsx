@@ -53,6 +53,10 @@ function DoctorDashboard({ user, onLogout, onBack }) {
   const [patientHistory, setPatientHistory] = useState([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [expandedRx, setExpandedRx] = useState(null);
+  const [showPatientDetails, setShowPatientDetails] = useState(false);
+  const [patientDetails, setPatientDetails] = useState(null);
+  const [loadingPatientDetails, setLoadingPatientDetails] = useState(false);
+  const [patientDetailsError, setPatientDetailsError] = useState("");
 
   // AI Patient Clinical Summary Copilot
   const [aiSummary, setAiSummary] = useState(null);
@@ -111,6 +115,28 @@ function DoctorDashboard({ user, onLogout, onBack }) {
       setAiSummary(null);
     } finally {
       setLoadingAiSummary(false);
+    }
+  };
+
+  const openPatientDetails = async (patientId) => {
+    if (!patientId) return;
+
+    setShowPatientDetails(true);
+    setPatientDetails(null);
+    setPatientDetailsError("");
+    setLoadingPatientDetails(true);
+
+    try {
+      const res = await api.get(`/doctor/patient/${patientId}`);
+      if (res.data?.success) {
+        setPatientDetails(res.data.data);
+      } else {
+        setPatientDetailsError("Patient details could not be loaded.");
+      }
+    } catch (e) {
+      setPatientDetailsError(e?.response?.data?.message || "Patient details could not be loaded.");
+    } finally {
+      setLoadingPatientDetails(false);
     }
   };
 
@@ -274,7 +300,12 @@ function DoctorDashboard({ user, onLogout, onBack }) {
                 </div>
                 <div className="mt-6 pt-4 border-t border-slate-800 flex flex-wrap items-end justify-between gap-4">
                   <div>
-                    <p className="text-xl font-bold">{current.patient?.name}</p>
+                    <button
+                      onClick={() => openPatientDetails(current.patient?.id)}
+                      className="text-left text-xl font-bold hover:text-sky-300 underline-offset-4 hover:underline"
+                    >
+                      {current.patient?.name}
+                    </button>
                     <p className="text-xs text-slate-400 mt-1">
                       In at {formatTime(current.check_in_time)} · Phone: {current.patient?.phone || "Registered Patient"}
                     </p>
@@ -343,7 +374,12 @@ function DoctorDashboard({ user, onLogout, onBack }) {
                       #{token.number}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-bold text-slate-900">{token.patient?.name}</p>
+                      <button
+                        onClick={() => openPatientDetails(token.patient?.id)}
+                        className="block max-w-full truncate text-left text-sm font-bold text-slate-900 hover:text-sky-700 hover:underline underline-offset-4"
+                      >
+                        {token.patient?.name}
+                      </button>
                       <p className="text-xs text-slate-500">~{token.est_wait_time || (i + 1) * 15} min est. wait</p>
                     </div>
                     <span className="text-xs text-slate-400">{formatTime(token.check_in_time)}</span>
@@ -573,15 +609,20 @@ function DoctorDashboard({ user, onLogout, onBack }) {
             <div className="mt-5 space-y-3">
               {dashboard?.recent_prescriptions?.length ? (
                 dashboard.recent_prescriptions.map((rx) => (
-                  <div key={rx.id} className="flex items-center justify-between rounded-2xl bg-slate-50 p-3.5 border border-slate-100">
-                    <div>
-                      <p className="text-sm font-bold text-slate-900">{rx.patient}</p>
-                      <p className="text-xs text-slate-500">Issued {formatTime(rx.issued_at)}</p>
-                    </div>
+                  <button
+                    key={rx.id}
+                    onClick={() => openPatientDetails(rx.patient_id)}
+                    disabled={!rx.patient_id}
+                    className="flex w-full items-center justify-between rounded-2xl bg-slate-50 p-3.5 text-left border border-slate-100 transition hover:border-sky-200 hover:bg-sky-50 disabled:cursor-default"
+                  >
+                    <span>
+                      <span className="block text-sm font-bold text-slate-900">{rx.patient}</span>
+                      <span className="block text-xs text-slate-500">Issued {formatTime(rx.issued_at)}</span>
+                    </span>
                     <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-bold text-emerald-700 border border-emerald-200">
                       <Check className="h-3 w-3" /> Signed &amp; Vaulted
                     </span>
-                  </div>
+                  </button>
                 ))
               ) : (
                 <p className="text-xs text-slate-500 text-center py-4">No prescriptions issued yet this shift.</p>
@@ -621,6 +662,108 @@ function DoctorDashboard({ user, onLogout, onBack }) {
             </div>
           </div>
         </section>
+
+        {showPatientDetails && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 backdrop-blur-sm p-4">
+            <section
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="patient-details-title"
+              className="my-6 max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl sm:p-8"
+            >
+              <div className="flex items-start justify-between gap-4 border-b border-slate-100 pb-5">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wider text-sky-600">Patient Record</p>
+                  <h2 id="patient-details-title" className="mt-1 text-2xl font-bold text-slate-950">
+                    {patientDetails?.patient?.name || "Patient Details"}
+                  </h2>
+                  {patientDetails?.patient?.id && (
+                    <p className="mt-1 text-xs text-slate-500">Patient ID: {patientDetails.patient.id}</p>
+                  )}
+                </div>
+                <button
+                  onClick={() => setShowPatientDetails(false)}
+                  aria-label="Close patient details"
+                  className="rounded-full p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              {loadingPatientDetails ? (
+                <div className="py-12 text-center text-sm text-slate-500">Loading patient record…</div>
+              ) : patientDetailsError ? (
+                <div role="alert" className="mt-5 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                  {patientDetailsError}
+                </div>
+              ) : patientDetails?.patient ? (
+                <div className="mt-6 space-y-6">
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-900">Personal &amp; Contact Details</h3>
+                    <dl className="mt-3 grid gap-3 sm:grid-cols-2">
+                      <PatientDetail label="Phone" value={patientDetails.patient.phone} />
+                      <PatientDetail label="Secondary phone" value={patientDetails.patient.secondary_phone} />
+                      <PatientDetail label="Email" value={patientDetails.patient.email} />
+                      <PatientDetail label="Date of birth" value={formatDate(patientDetails.patient.date_of_birth)} />
+                      <PatientDetail label="Age" value={patientDetails.patient.age ? `${patientDetails.patient.age} years` : null} />
+                      <PatientDetail label="Gender" value={patientDetails.patient.gender} />
+                      <PatientDetail label="Marital status" value={patientDetails.patient.marital_status} />
+                      <PatientDetail label="Address" value={patientDetails.patient.address} />
+                    </dl>
+                  </div>
+
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-900">Clinical &amp; Emergency Details</h3>
+                    <dl className="mt-3 grid gap-3 sm:grid-cols-2">
+                      <PatientDetail label="Blood group" value={patientDetails.patient.blood_group} />
+                      <PatientDetail label="Allergies" value={patientDetails.patient.allergies} />
+                      <PatientDetail label="Emergency contact" value={patientDetails.patient.emergency_contact_name} />
+                      <PatientDetail label="Emergency phone" value={patientDetails.patient.emergency_contact_phone} />
+                      <PatientDetail label="Registered for another person" value={patientDetails.patient.registering_for_other ? "Yes" : "No"} />
+                      <PatientDetail label="Relationship to patient" value={patientDetails.patient.relationship_to_patient} />
+                      <PatientDetail label="Parent / guardian" value={patientDetails.patient.parent_guardian_name} />
+                      <PatientDetail label="Parent / guardian phone" value={patientDetails.patient.parent_guardian_phone} />
+                      <PatientDetail label="Friend / parent contact" value={patientDetails.patient.friend_parent_name} />
+                      <PatientDetail label="Friend / parent phone" value={patientDetails.patient.friend_parent_phone} />
+                    </dl>
+                  </div>
+
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-900">Prescription History</h3>
+                    {patientDetails.prescriptions?.length ? (
+                      <div className="mt-3 space-y-3">
+                        {patientDetails.prescriptions.map((rx) => (
+                          <article key={rx.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <p className="text-sm font-bold text-slate-900">Issued {formatDate(rx.issued_at)}</p>
+                              <p className="text-xs text-slate-500">By {rx.doctor_name}</p>
+                            </div>
+                            {rx.notes && <p className="mt-2 text-sm text-slate-700">{rx.notes}</p>}
+                            {rx.items?.length > 0 && (
+                              <ul className="mt-3 space-y-2">
+                                {rx.items.map((item, index) => (
+                                  <li key={`${rx.id}-${index}`} className="rounded-xl bg-white p-3 text-xs text-slate-700">
+                                    <p className="font-bold text-slate-900">{item.medicine_name}</p>
+                                    <p className="mt-1">
+                                      {[item.dosage, item.frequency, item.duration].filter(Boolean).join(" · ")}
+                                    </p>
+                                    {item.instructions && <p className="mt-1 text-slate-500">{item.instructions}</p>}
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                          </article>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="mt-3 rounded-2xl bg-slate-50 p-4 text-sm text-slate-500">No prescription history found.</p>
+                    )}
+                  </div>
+                </div>
+              ) : null}
+            </section>
+          </div>
+        )}
 
         {/* Digital Prescription Modal */}
         {showRxModal && current && (
@@ -772,6 +915,17 @@ function Metric({ icon, label, value, detail, tone }) {
       <p className="mt-4 text-xs font-bold uppercase tracking-wider text-slate-500">{label}</p>
       <p className="mt-1 text-3xl font-extrabold text-slate-950">{value}</p>
       <p className="mt-1 text-xs text-slate-500">{detail}</p>
+    </div>
+  );
+}
+
+function PatientDetail({ label, value }) {
+  return (
+    <div className="rounded-xl border border-slate-100 bg-slate-50 px-3.5 py-3">
+      <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{label}</dt>
+      <dd className="mt-1 break-words text-sm font-medium text-slate-900">
+        {value || "Not provided"}
+      </dd>
     </div>
   );
 }

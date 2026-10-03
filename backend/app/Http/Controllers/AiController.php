@@ -47,7 +47,14 @@ class AiController extends Controller
                     'Ophthalmology' => ['ophthalmology', 'ophthalmologist'],
                     'Psychiatry' => ['psychiatry', 'psychiatrist'],
                 ];
-                $aliases = $specialtyAliases[$analysis['recommended_specialty']] ?? [];
+                $recommendedSpecialties = $analysis['recommended_specialties']
+                    ?? array_filter([$analysis['recommended_specialty']]);
+                $aliasesBySpecialty = collect($recommendedSpecialties)
+                    ->mapWithKeys(fn (string $specialty) => [
+                        $specialty => $specialtyAliases[$specialty] ?? [],
+                    ])
+                    ->filter(fn (array $aliases) => $aliases !== []);
+                $aliases = $aliasesBySpecialty->flatten()->all();
                 $doctors = Doctor::with(['user', 'clinic'])->get();
                 $waitingCounts = QueueToken::query()
                     ->select('doctor_id')
@@ -57,16 +64,35 @@ class AiController extends Controller
                     ->get()
                     ->keyBy('doctor_id');
 
-                $matchingDoctors = $doctors->filter(function (Doctor $doctor) use ($aliases) {
-                    return $this->doctorMatchesSpecialty($doctor->specialization, $aliases);
-                })->sort(function (Doctor $left, Doctor $right) use ($waitingCounts) {
-                    $leftQueue = (int) ($waitingCounts->get($left->doctor_id)->waiting_count ?? 0);
-                    $rightQueue = (int) ($waitingCounts->get($right->doctor_id)->waiting_count ?? 0);
-                    $leftRank = [$left->availability_status === 'available' ? 0 : 1, $leftQueue];
-                    $rightRank = [$right->availability_status === 'available' ? 0 : 1, $rightQueue];
+                $matchingDoctors = $doctors->map(function (Doctor $doctor) use ($aliasesBySpecialty) {
+                    $matchedSpecialty = $aliasesBySpecialty->keys()->first(
+                        fn (string $specialty) => $this->doctorMatchesSpecialty(
+                            $doctor->specialization,
+                            $aliasesBySpecialty->get($specialty)
+                        )
+                    );
+
+                    return $matchedSpecialty ? [$doctor, $matchedSpecialty] : null;
+                })->filter()->sort(function (array $left, array $right) use ($waitingCounts, $recommendedSpecialties) {
+                    $leftSpecialtyRank = array_search($left[1], $recommendedSpecialties, true);
+                    $rightSpecialtyRank = array_search($right[1], $recommendedSpecialties, true);
+                    if ($leftSpecialtyRank !== $rightSpecialtyRank) {
+                        return $leftSpecialtyRank <=> $rightSpecialtyRank;
+                    }
+
+                    /** @var Doctor $leftDoctor */
+                    $leftDoctor = $left[0];
+                    /** @var Doctor $rightDoctor */
+                    $rightDoctor = $right[0];
+                    $leftQueue = (int) ($waitingCounts->get($leftDoctor->doctor_id)->waiting_count ?? 0);
+                    $rightQueue = (int) ($waitingCounts->get($rightDoctor->doctor_id)->waiting_count ?? 0);
+                    $leftRank = [$leftDoctor->availability_status === 'available' ? 0 : 1, $leftQueue];
+                    $rightRank = [$rightDoctor->availability_status === 'available' ? 0 : 1, $rightQueue];
 
                     return $leftRank <=> $rightRank;
-                })->values()->map(function (Doctor $doctor) use ($waitingCounts) {
+                })->values()->map(function (array $match) use ($waitingCounts) {
+                    /** @var Doctor $doctor */
+                    [$doctor, $matchedSpecialty] = $match;
                     $waitingCount = (int) ($waitingCounts->get($doctor->doctor_id)->waiting_count ?? 0);
 
                     return [
@@ -79,7 +105,8 @@ class AiController extends Controller
                         'avg_consult_min' => $doctor->avg_consult_min ?? 15,
                         'waiting_patients' => $waitingCount,
                         'est_wait_minutes' => $waitingCount * ($doctor->avg_consult_min ?? 15),
-                        'match_label' => 'Specialty match',
+                        'match_label' => $matchedSpecialty . ' match',
+                        'matched_specialty' => $matchedSpecialty,
                     ];
                 });
 

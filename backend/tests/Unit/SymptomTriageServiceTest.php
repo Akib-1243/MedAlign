@@ -54,4 +54,13 @@ class SymptomTriageServiceTest extends TestCase
 
         $this->assertSame('Pediatrics', $result['recommended_specialty']);
     }
+
+    public function test_multiple_symptom_groups_return_all_relevant_specialties_in_rank_order(): void
+    {
+        $result = $this->triage->analyze('I have chest pain and knee pain');
+
+        $this->assertSame('Cardiology', $result['recommended_specialty']);
+        $this->assertSame(['Cardiology', 'Orthopedics'], $result['recommended_specialties']);
+        $this->assertSame(['Orthopedics'], $result['alternative_specialties']);
+    }
 }

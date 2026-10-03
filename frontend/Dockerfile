@@ -8,7 +8,10 @@ RUN npm ci
 
 COPY . .
 
-# Build with VITE_API_BASE_URL passed at build time (or from .env.production)
+# Accept API URL as build-time argument (passed from docker-compose)
+ARG VITE_API_BASE_URL=http://localhost:9000/api
+ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
+
 RUN npm run build
 
 # ── Stage 2: Serve with Nginx ─────────────────────────────────────────────────

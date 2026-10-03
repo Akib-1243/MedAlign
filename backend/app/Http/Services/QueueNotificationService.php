@@ -6,7 +6,7 @@ use App\Models\QueueToken;
 
 /**
  * Sends Telegram alerts to patients as the queue moves:
- * - "your turn is near" once a waiting patient is within their threshold
+ * - "your turn is near" when three or fewer patients are ahead
  * - "it's your turn" when the doctor calls their token
  *
  * Only patients who have linked Telegram (and kept Telegram alerts on) are
@@ -14,8 +14,7 @@ use App\Models\QueueToken;
  */
 class QueueNotificationService
 {
-    // Upper bound of the near-turn threshold slider in the patient portal.
-    private const MAX_THRESHOLD = 6;
+    private const NEAR_TURN_THRESHOLD = 3;
 
     public function __construct(private TelegramService $telegram)
     {
@@ -42,7 +41,7 @@ class QueueNotificationService
 
     /**
      * Alert every waiting patient for this doctor who has just come within
-     * their near-turn threshold. Each token is alerted at most once.
+     * the fixed near-turn range. Each token is alerted at most once.
      */
     public function notifyNearTurn(?int $doctorId): void
     {
@@ -54,7 +53,7 @@ class QueueNotificationService
             ->where('doctor_id', $doctorId)
             ->where('status', 'waiting')
             ->orderBy('token_number')
-            ->limit(self::MAX_THRESHOLD + 1)
+            ->limit(self::NEAR_TURN_THRESHOLD + 1)
             ->get();
 
         foreach ($waiting as $ahead => $token) {
@@ -62,8 +61,7 @@ class QueueNotificationService
                 continue;
             }
 
-            $threshold = $token->patient?->alertPreferences?->near_turn_threshold ?? 3;
-            if ($ahead > $threshold || !$chatId = $this->chatIdFor($token)) {
+            if ($ahead > self::NEAR_TURN_THRESHOLD || !$chatId = $this->chatIdFor($token)) {
                 continue;
             }
 

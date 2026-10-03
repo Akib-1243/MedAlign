@@ -156,6 +156,7 @@ class SymptomTriageService
                 'preparation_advice' => null,
                 'recognized_symptoms' => array_values(array_unique($matchedSignals)),
                 'alternative_specialties' => [],
+                'recommended_specialties' => [],
                 'medications_mentioned' => $medications,
             ];
         }
@@ -174,19 +175,17 @@ class SymptomTriageService
                 'preparation_advice' => null,
                 'recognized_symptoms' => [],
                 'alternative_specialties' => [],
+                'recommended_specialties' => [],
                 'medications_mentioned' => $medications,
             ];
         }
 
         $specialties = array_keys($ranked);
         $recommended = $specialties[0];
-        $topScore = $ranked[$recommended];
-        $alternatives = isset($specialties[1]) && $topScore - $ranked[$specialties[1]] <= 1
-            ? [$specialties[1]]
-            : [];
+        $alternatives = array_slice($specialties, 1);
         $rationale = self::SPECIALTIES[$recommended]['reason'];
         if ($alternatives !== []) {
-            $rationale = 'The symptoms described could fit more than one specialty. ' . $recommended . ' is one reasonable starting point; ' . $alternatives[0] . ' may also be relevant. A clinician can assess the full picture.';
+            $rationale = 'The symptoms described may involve more than one area. ' . $recommended . ' is the strongest match; ' . implode(', ', $alternatives) . ' may also be relevant. A clinician can assess the full picture.';
         }
 
         $preparation = self::SPECIALTIES[$recommended]['preparation'];
@@ -205,6 +204,7 @@ class SymptomTriageService
             'preparation_advice' => $preparation,
             'recognized_symptoms' => array_values(array_unique($matchedSignals)),
             'alternative_specialties' => $alternatives,
+            'recommended_specialties' => $specialties,
             'medications_mentioned' => $medications,
         ];
     }

@@ -1,14 +1,6 @@
 import Navbar from "../components/Navbar";
 import {
-  Stethoscope,
-  CalendarDays,
-  ShieldCheck,
-  Ambulance,
-  ClipboardList,
-  Pill,
   HeartPulse,
-  UserCheck,
-  Activity,
 } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -186,20 +178,15 @@ function LandingPage({
 
 
           <motion.div
-            className="p-8 rounded-2xl bg-gradient-to-br from-blue-50/80 to-blue-100/60 backdrop-blur-2xl border border-blue-300/50 hover:border-blue-400/70 hover:bg-blue-100/70 transition duration-500 shadow-lg hover:shadow-2xl hover:shadow-blue-400/30 group overflow-hidden relative"
+            className="p-8 rounded-2xl bg-blue-50 border border-blue-200 hover:border-blue-300 hover:bg-blue-100/70 transition duration-500 shadow-lg hover:shadow-2xl hover:shadow-blue-200/60"
             whileHover={{ y: -8 }}
           >
-            <div className="absolute inset-0 rounded-2xl border border-blue-200/40 pointer-events-none"></div>
-            <div className="absolute -inset-1 rounded-2xl bg-gradient-to-br from-blue-300/10 to-blue-400/5 blur-lg -z-10"></div>
-            <Stethoscope className="text-blue-600 group-hover:text-blue-700 w-12 h-12 transition duration-500 relative z-10" />
-
-
-            <h3 className="mt-5 text-xl font-bold text-blue-700 relative z-10">
+            <h3 className="text-xl font-bold text-blue-700">
               Find Doctors
             </h3>
 
 
-            <p className="mt-3 text-gray-700 relative z-10">
+            <p className="mt-3 text-gray-700">
               Connect with verified doctors based on your healthcare needs.
             </p>
 
@@ -209,20 +196,15 @@ function LandingPage({
 
 
           <motion.div
-            className="p-8 rounded-2xl bg-gradient-to-br from-indigo-50/80 to-indigo-100/60 backdrop-blur-2xl border border-indigo-300/50 hover:border-indigo-400/70 hover:bg-indigo-100/70 transition duration-500 shadow-lg hover:shadow-2xl hover:shadow-indigo-400/30 group overflow-hidden relative"
+            className="p-8 rounded-2xl bg-blue-50 border border-blue-200 hover:border-blue-300 hover:bg-blue-100/70 transition duration-500 shadow-lg hover:shadow-2xl hover:shadow-blue-200/60"
             whileHover={{ y: -8 }}
           >
-            <div className="absolute inset-0 rounded-2xl border border-indigo-200/40 pointer-events-none"></div>
-            <div className="absolute -inset-1 rounded-2xl bg-gradient-to-br from-indigo-300/10 to-indigo-400/5 blur-lg -z-10"></div>
-            <CalendarDays className="text-indigo-600 group-hover:text-indigo-700 w-12 h-12 transition duration-500 relative z-10" />
-
-
-            <h3 className="mt-5 text-xl font-bold text-indigo-700 relative z-10">
+            <h3 className="text-xl font-bold text-blue-700">
               Easy Appointments
             </h3>
 
 
-            <p className="mt-3 text-gray-700 relative z-10">
+            <p className="mt-3 text-gray-700">
               Schedule appointments quickly without unnecessary waiting.
             </p>
 
@@ -233,20 +215,15 @@ function LandingPage({
 
 
           <motion.div
-            className="p-8 rounded-2xl bg-gradient-to-br from-green-50/80 to-green-100/60 backdrop-blur-2xl border border-green-300/50 hover:border-green-400/70 hover:bg-green-100/70 transition duration-500 shadow-lg hover:shadow-2xl hover:shadow-green-400/30 group overflow-hidden relative"
+            className="p-8 rounded-2xl bg-blue-50 border border-blue-200 hover:border-blue-300 hover:bg-blue-100/70 transition duration-500 shadow-lg hover:shadow-2xl hover:shadow-blue-200/60"
             whileHover={{ y: -8 }}
           >
-            <div className="absolute inset-0 rounded-2xl border border-green-200/40 pointer-events-none"></div>
-            <div className="absolute -inset-1 rounded-2xl bg-gradient-to-br from-green-300/10 to-green-400/5 blur-lg -z-10"></div>
-            <ShieldCheck className="text-green-600 group-hover:text-green-700 w-12 h-12 transition duration-500 relative z-10" />
-
-
-            <h3 className="mt-5 text-xl font-bold text-green-700 relative z-10">
+            <h3 className="text-xl font-bold text-blue-700">
               Secure Records
             </h3>
 
 
-            <p className="mt-3 text-gray-700 relative z-10">
+            <p className="mt-3 text-gray-700">
               Keep your medical information private and protected.
             </p>
 
@@ -290,20 +267,15 @@ function LandingPage({
 
           {/* Service Card 1 */}
           <motion.div
-            className="p-6 rounded-2xl bg-gradient-to-br from-blue-50/80 to-blue-100/60 backdrop-blur-2xl border border-blue-300/50 hover:border-blue-400/70 hover:bg-blue-100/70 transition duration-500 shadow-lg hover:shadow-2xl hover:shadow-blue-400/30 group overflow-hidden relative"
+            className="p-6 rounded-2xl bg-blue-50 border border-blue-200 hover:border-blue-300 hover:bg-blue-100/70 transition duration-500 shadow-lg hover:shadow-2xl hover:shadow-blue-200/60"
             whileHover={{ y: -8 }}
           >
-            <div className="absolute inset-0 rounded-2xl border border-blue-200/40 pointer-events-none"></div>
-            <div className="absolute -inset-1 rounded-2xl bg-gradient-to-br from-blue-300/10 to-blue-400/5 blur-lg -z-10"></div>
-            <Stethoscope className="text-blue-600 group-hover:text-blue-700 w-12 h-12 transition duration-500 relative z-10" />
-
-
-            <h3 className="mt-4 text-xl font-bold text-blue-700 relative z-10">
+            <h3 className="text-xl font-bold text-blue-700">
               Online Consultation
             </h3>
 
 
-            <p className="mt-3 text-gray-700 relative z-10">
+            <p className="mt-3 text-gray-700">
               Consult with healthcare professionals from anywhere.
             </p>
 
@@ -316,20 +288,15 @@ function LandingPage({
 
           {/* Service Card 2 */}
           <motion.div
-            className="p-6 rounded-2xl bg-gradient-to-br from-red-50/80 to-red-100/60 backdrop-blur-2xl border border-red-300/50 hover:border-red-400/70 hover:bg-red-100/70 transition duration-500 shadow-lg hover:shadow-2xl hover:shadow-red-400/30 group overflow-hidden relative"
+            className="p-6 rounded-2xl bg-blue-50 border border-blue-200 hover:border-blue-300 hover:bg-blue-100/70 transition duration-500 shadow-lg hover:shadow-2xl hover:shadow-blue-200/60"
             whileHover={{ y: -8 }}
           >
-            <div className="absolute inset-0 rounded-2xl border border-red-200/40 pointer-events-none"></div>
-            <div className="absolute -inset-1 rounded-2xl bg-gradient-to-br from-red-300/10 to-red-400/5 blur-lg -z-10"></div>
-            <Ambulance className="text-red-600 group-hover:text-red-700 w-12 h-12 transition duration-500 relative z-10" />
-
-
-            <h3 className="mt-4 text-xl font-bold text-red-700 relative z-10">
+            <h3 className="text-xl font-bold text-blue-700">
               Emergency Support
             </h3>
 
 
-            <p className="mt-3 text-gray-700 relative z-10">
+            <p className="mt-3 text-gray-700">
               Get quick access to emergency healthcare assistance.
             </p>
 
@@ -342,20 +309,15 @@ function LandingPage({
 
           {/* Service Card 3 */}
           <motion.div
-            className="p-6 rounded-2xl bg-gradient-to-br from-green-50/80 to-green-100/60 backdrop-blur-2xl border border-green-300/50 hover:border-green-400/70 hover:bg-green-100/70 transition duration-500 shadow-lg hover:shadow-2xl hover:shadow-green-400/30 group overflow-hidden relative"
+            className="p-6 rounded-2xl bg-blue-50 border border-blue-200 hover:border-blue-300 hover:bg-blue-100/70 transition duration-500 shadow-lg hover:shadow-2xl hover:shadow-blue-200/60"
             whileHover={{ y: -8 }}
           >
-            <div className="absolute inset-0 rounded-2xl border border-green-200/40 pointer-events-none"></div>
-            <div className="absolute -inset-1 rounded-2xl bg-gradient-to-br from-green-300/10 to-green-400/5 blur-lg -z-10"></div>
-            <ClipboardList className="text-green-600 group-hover:text-green-700 w-12 h-12 transition duration-500 relative z-10" />
-
-
-            <h3 className="mt-4 text-xl font-bold text-green-700 relative z-10">
+            <h3 className="text-xl font-bold text-blue-700">
               Health Tracking
             </h3>
 
 
-            <p className="mt-3 text-gray-700 relative z-10">
+            <p className="mt-3 text-gray-700">
               Monitor and manage your health records securely.
             </p>
 
@@ -367,20 +329,15 @@ function LandingPage({
 
           {/* Service Card 4 */}
           <motion.div
-            className="p-6 rounded-2xl bg-gradient-to-br from-purple-50/80 to-purple-100/60 backdrop-blur-2xl border border-purple-300/50 hover:border-purple-400/70 hover:bg-purple-100/70 transition duration-500 shadow-lg hover:shadow-2xl hover:shadow-purple-400/30 group overflow-hidden relative"
+            className="p-6 rounded-2xl bg-blue-50 border border-blue-200 hover:border-blue-300 hover:bg-blue-100/70 transition duration-500 shadow-lg hover:shadow-2xl hover:shadow-blue-200/60"
             whileHover={{ y: -8 }}
           >
-            <div className="absolute inset-0 rounded-2xl border border-purple-200/40 pointer-events-none"></div>
-            <div className="absolute -inset-1 rounded-2xl bg-gradient-to-br from-purple-300/10 to-purple-400/5 blur-lg -z-10"></div>
-            <Pill className="text-purple-600 group-hover:text-purple-700 w-12 h-12 transition duration-500 relative z-10" />
-
-
-            <h3 className="mt-4 text-xl font-bold text-purple-700 relative z-10">
+            <h3 className="text-xl font-bold text-blue-700">
               Medicine Support
             </h3>
 
 
-            <p className="mt-3 text-gray-700 relative z-10">
+            <p className="mt-3 text-gray-700">
               Manage prescriptions and medication information.
             </p>
 
